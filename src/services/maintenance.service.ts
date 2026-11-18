@@ -36,31 +36,53 @@ export class MaintenanceService {
       }),
     ]);
 
-    const enriched = items.map((t) => ({
-      id: t.id,
-      ticketNumber: t.ticketNumber,
-      propertyId: t.propertyId,
-      propertyName: t.property.name,
-      unitId: t.unitId,
-      unitNumber: t.unit?.unitNumber || 'Common Area',
-      tenantId: t.tenantId,
-      tenantName: t.tenant?.name || 'On-Site Staff',
-      tenantPhone: t.tenant?.phone,
-      title: t.title,
-      issue: t.title,
-      description: t.description,
-      category: t.category,
-      priority: t.priority,
-      status: t.status,
-      stage: t.status,
-      costEstimate: t.costEstimate ? Number(t.costEstimate) : null,
-      cost: t.costEstimate ? Number(t.costEstimate) : 0,
-      adminApproved: t.adminApproved,
-      assignedStaffId: t.assignedStaffId,
-      assignedStaffName: t.assignedStaff?.name,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-    }));
+    const enriched = items.map((t) => {
+      let mappedStatus = 'New';
+      if (t.status === 'Open') mappedStatus = 'New';
+      else if (t.status === 'Pending_Approval') mappedStatus = 'Reviewed & Prioritized';
+      else if (t.status === 'In_Progress') mappedStatus = 'In Progress';
+      else if (t.status === 'Resolved') mappedStatus = 'Completed — Needs Review';
+      else if (t.status === 'Closed') mappedStatus = 'Closed';
+      else mappedStatus = t.status;
+
+      const priorityMap: Record<string, string> = {
+        Emergency: 'Urgent',
+        High: 'High',
+        Medium: 'Normal',
+        Low: 'Low',
+      };
+
+      return {
+        id: t.ticketNumber || `WO-${t.id}`,
+        dbId: t.id,
+        ticketNumber: t.ticketNumber,
+        propertyId: t.propertyId,
+        propertyName: t.property?.name || 'Main Property',
+        unitId: t.unitId,
+        unitNumber: t.unit?.unitNumber || 'Common Area',
+        unit: t.unit?.unitNumber || 'Common Area',
+        tenantId: t.tenantId,
+        tenantName: t.tenant?.name || 'On-Site Staff',
+        tenant: t.tenant?.name || 'On-Site Staff',
+        tenantPhone: t.tenant?.phone,
+        title: t.title,
+        issue: t.title,
+        description: t.description,
+        category: t.category,
+        priority: priorityMap[t.priority] || t.priority,
+        status: mappedStatus,
+        stage: mappedStatus,
+        costEstimate: t.costEstimate ? Number(t.costEstimate) : null,
+        estimatedCost: t.costEstimate ? Number(t.costEstimate) : 0,
+        cost: t.costEstimate ? Number(t.costEstimate) : 0,
+        adminApproved: t.adminApproved,
+        assignedStaffId: t.assignedStaffId,
+        assignedStaffName: t.assignedStaff?.name,
+        assignedTo: t.assignedStaff?.name || 'QuickFix Plumbing',
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      };
+    });
 
     return { items: enriched, total, page, limit };
   }
@@ -81,22 +103,89 @@ export class MaintenanceService {
   }
 
   static async createTicket(data: any) {
-    const ticketNumber = `TKT-${Math.floor(1000 + Math.random() * 9000)}`;
+    const ticketNumber = `WO-${Math.floor(300 + Math.random() * 900)}`;
 
-    return prisma.maintenanceTicket.create({
+    let propId = data.propertyId ? Number(data.propertyId) : null;
+    if (!propId || isNaN(propId)) {
+      if (data.propertyName) {
+        const found = await prisma.property.findFirst({
+          where: { name: { contains: data.propertyName } },
+        });
+        if (found) propId = found.id;
+      }
+    }
+    if (!propId || isNaN(propId)) {
+      const firstProp = await prisma.property.findFirst({ orderBy: { id: 'asc' } });
+      propId = firstProp ? firstProp.id : 1;
+    }
+
+    let unitId = data.unitId ? Number(data.unitId) : null;
+    if (!unitId && data.unit) {
+      const foundUnit = await prisma.unit.findFirst({
+        where: {
+          propertyId: propId,
+          unitNumber: String(data.unit).trim(),
+        },
+      });
+      if (foundUnit) unitId = foundUnit.id;
+    }
+
+    let priority: 'Low' | 'Medium' | 'High' | 'Emergency' = 'Medium';
+    if (data.priority === 'High') priority = 'High';
+    else if (data.priority === 'Emergency' || data.priority === 'Urgent') priority = 'Emergency';
+    else if (data.priority === 'Low') priority = 'Low';
+    else priority = 'Medium';
+
+    const costEstimate =
+      data.costEstimate !== undefined && data.costEstimate !== null
+        ? Number(data.costEstimate)
+        : data.cost !== undefined && data.cost !== null
+        ? Number(data.cost)
+        : data.estimatedCost !== undefined && data.estimatedCost !== null
+        ? Number(data.estimatedCost)
+        : null;
+
+    const created = await prisma.maintenanceTicket.create({
       data: {
         ticketNumber,
-        propertyId: data.propertyId,
-        unitId: data.unitId,
-        tenantId: data.tenantId,
-        title: data.title,
-        description: data.description,
+        propertyId: propId,
+        unitId,
+        tenantId: data.tenantId ? Number(data.tenantId) : null,
+        title: data.title || 'Maintenance Request',
+        description: data.description || data.title || 'Maintenance work order',
         category: data.category || 'General',
-        priority: data.priority || 'Medium',
-        status: 'Open',
+        priority,
+        costEstimate: costEstimate && !isNaN(costEstimate) ? costEstimate : null,
+        status: costEstimate && costEstimate > 1000 ? 'Pending_Approval' : 'Open',
+        adminApproved: costEstimate ? costEstimate <= 1000 : true,
       },
       include: { property: true, unit: true, tenant: true },
     });
+
+    return {
+      id: created.ticketNumber,
+      dbId: created.id,
+      ticketNumber: created.ticketNumber,
+      propertyId: created.propertyId,
+      propertyName: created.property?.name || data.propertyName || 'Property',
+      unitId: created.unitId,
+      unitNumber: created.unit?.unitNumber || data.unit || 'Common Area',
+      unit: created.unit?.unitNumber || data.unit || 'Common Area',
+      tenantId: created.tenantId,
+      tenant: created.tenant?.name || data.tenant || 'Rebecca Miller',
+      title: created.title,
+      category: created.category,
+      priority: data.priority || (created.priority === 'Emergency' ? 'Urgent' : created.priority),
+      status: created.status === 'Open' ? 'New' : 'Reviewed & Prioritized',
+      stage: created.status === 'Open' ? 'New' : 'Reviewed & Prioritized',
+      estimatedCost: costEstimate || 0,
+      costEstimate: costEstimate || null,
+      cost: costEstimate || 0,
+      assignedTo: data.assignedTo || 'QuickFix Plumbing',
+      adminApproved: created.adminApproved,
+      date: new Date().toISOString().slice(0, 10),
+      createdAt: created.createdAt,
+    };
   }
 
   static async triageTicket(id: number, data: any, user?: AuthUserPayload) {
