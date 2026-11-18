@@ -19,11 +19,11 @@ export class UserController {
           id: o.id,
           name: o.name,
           email: o.email,
-          phone: o.phone || '+1 (212) 555-0188',
+          phone: o.phone || '',
           role: o.role,
-          ownerType: 'LLC',
-          entityName: `${o.name} Real Estate Investments LLC`,
-          mailingAddress: '550 Madison Ave, New York, NY 10022',
+          ownerType: 'Individual',
+          entityName: o.name,
+          mailingAddress: '',
           distributionMethod: 'Direct Deposit (ACH)',
           bankAccountMasked: 'Chase (****4821)',
           properties: propNames,
@@ -70,6 +70,44 @@ export class UserController {
       });
 
       return sendSuccess(res, user, 'Owner created successfully', 201);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateOwner(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { name, email, phone, password } = req.body;
+
+      const dataToUpdate: any = {};
+      if (name) dataToUpdate.name = name;
+      if (email) dataToUpdate.email = email.toLowerCase().trim();
+      if (phone !== undefined) dataToUpdate.phone = phone;
+      if (password && password.trim().length >= 4) {
+        dataToUpdate.passwordHash = await hashPassword(password.trim());
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: dataToUpdate,
+      });
+
+      return sendSuccess(res, updated, 'Owner profile updated successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteOwner(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await prisma.broadcast.deleteMany({ where: { sentByUserId: id } }).catch(() => {});
+      await prisma.userPermission.deleteMany({ where: { userId: id } }).catch(() => {});
+      await prisma.property.updateMany({ where: { ownerId: id }, data: { ownerId: null } }).catch(() => {});
+
+      await prisma.user.delete({ where: { id } });
+      return sendSuccess(res, { id }, 'Owner deleted successfully');
     } catch (error) {
       return next(error);
     }

@@ -38,6 +38,8 @@ router.use('/search', searchRoutes);
 // Owners and Managers Directories
 router.get('/owners', authenticateToken, UserController.listOwners);
 router.post('/owners', authenticateToken, UserController.createOwner);
+router.put('/owners/:id', authenticateToken, UserController.updateOwner);
+router.delete('/owners/:id', authenticateToken, UserController.deleteOwner);
 router.get('/managers', authenticateToken, UserController.listManagers);
 router.post('/managers', authenticateToken, UserController.createManager);
 router.put('/managers/:id', authenticateToken, UserController.updateManager);

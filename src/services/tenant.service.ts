@@ -94,43 +94,76 @@ export class TenantService {
   static async createTenant(data: any) {
     let userId: number | undefined;
 
-    if (data.createPortalLogin) {
-      const passwordHash = await hashPassword(data.password || 'demo123');
-      const user = await prisma.user.create({
-        data: {
-          email: data.email.toLowerCase(),
-          passwordHash,
-          name: data.name,
-          phone: data.phone,
-          role: 'tenant',
+    if (data.createPortalLogin !== false) {
+      const email = (data.email || '').toLowerCase().trim();
+      const existingUser = await prisma.user.findUnique({ where: { email } });
+      if (existingUser) {
+        userId = existingUser.id;
+      } else {
+        const passwordHash = await hashPassword(data.password || 'demo123');
+        const user = await prisma.user.create({
+          data: {
+            email,
+            passwordHash,
+            name: data.name,
+            phone: data.phone || data.mobile || '',
+            role: 'tenant',
+          },
+        });
+        userId = user.id;
+      }
+    }
+
+    // Resolve propertyId
+    let propId = data.propertyId ? Number(data.propertyId) : null;
+    if (!propId || isNaN(propId)) {
+      if (data.propertyName) {
+        const found = await prisma.property.findFirst({
+          where: { name: { contains: data.propertyName } },
+        });
+        if (found) propId = found.id;
+      }
+    }
+    if (!propId || isNaN(propId)) {
+      const firstProp = await prisma.property.findFirst({ orderBy: { id: 'asc' } });
+      propId = firstProp ? firstProp.id : 1;
+    }
+
+    // Resolve unitId
+    let unitId = data.unitId ? Number(data.unitId) : null;
+    if ((!unitId || isNaN(unitId)) && data.unitNumber) {
+      const foundUnit = await prisma.unit.findFirst({
+        where: {
+          propertyId: propId,
+          unitNumber: String(data.unitNumber).trim(),
         },
       });
-      userId = user.id;
+      if (foundUnit) unitId = foundUnit.id;
     }
 
     const tenant = await prisma.tenant.create({
       data: {
         userId,
-        propertyId: data.propertyId,
-        unitId: data.unitId,
+        propertyId: propId,
+        unitId: unitId && !isNaN(unitId) ? unitId : null,
         name: data.name,
-        email: data.email.toLowerCase(),
-        phone: data.phone,
+        email: data.email.toLowerCase().trim(),
+        phone: data.phone || data.mobile || '+1 (347) 555-0190',
         status: data.status || 'Active',
         emergencyContact: data.emergencyContact,
         vehiclePlate: data.vehiclePlate,
         moveInDate: data.moveInDate ? new Date(data.moveInDate) : new Date(),
-        privateNotes: data.privateNotes,
+        privateNotes: data.privateNotes || data.notes,
       },
       include: { property: true, unit: true },
     });
 
     // Auto-sync unit status to Occupied if unit was assigned
-    if (data.unitId) {
+    if (unitId && !isNaN(unitId)) {
       await prisma.unit.update({
-        where: { id: data.unitId },
+        where: { id: unitId },
         data: { status: 'Occupied' },
-      });
+      }).catch(() => {});
     }
 
     return tenant;
@@ -161,7 +194,7 @@ export class TenantService {
         target: `${tenant.name} (${tenant.email})`,
         reason: 'Tenant record removed via Tenant Management',
       },
-    });
+    }).catch(() => {});
 
     // If unit was assigned, free it if no other active tenants
     if (tenant.unitId) {
@@ -172,15 +205,26 @@ export class TenantService {
         await prisma.unit.update({
           where: { id: tenant.unitId },
           data: { status: 'Vacant' },
-        });
+        }).catch(() => {});
       }
     }
 
     // Clean up child records with foreign key constraints
-    await prisma.invoice.deleteMany({ where: { tenantId: id } });
-    await prisma.lease.deleteMany({ where: { tenantId: id } });
-    await prisma.maintenanceTicket.deleteMany({ where: { tenantId: id } });
+    await prisma.securityDeposit.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await prisma.ledgerAdjustment.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await prisma.visitorPass.deleteMany({ where: { hostTenantId: id } }).catch(() => {});
+    await prisma.parkingStall.updateMany({ where: { assignedTenantId: id }, data: { assignedTenantId: null, status: 'Vacant' } }).catch(() => {});
+    await prisma.invoice.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await prisma.lease.deleteMany({ where: { tenantId: id } }).catch(() => {});
+    await prisma.maintenanceTicket.deleteMany({ where: { tenantId: id } }).catch(() => {});
 
-    return prisma.tenant.delete({ where: { id } });
+    const deleted = await prisma.tenant.delete({ where: { id } });
+
+    // Clean up login user account if exists
+    if (tenant.userId) {
+      await prisma.user.delete({ where: { id: tenant.userId } }).catch(() => {});
+    }
+
+    return deleted;
   }
 }
