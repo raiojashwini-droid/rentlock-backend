@@ -51,6 +51,13 @@ export class PropertyService {
         .filter((u) => u.status === 'Occupied')
         .reduce((sum, u) => sum + Number(u.rentAmount || 0), 0);
 
+      const notes = p.accessNotes || '';
+      const customCode = notes.match(/\[CODE:(.*?)\]/)?.[1];
+      const customCategory = notes.match(/\[CATEGORY:(.*?)\]/)?.[1];
+      const customPortfolio = notes.match(/\[PORTFOLIO:(.*?)\]/)?.[1];
+      const customMgr = notes.match(/\[MGR:(.*?)\]/)?.[1];
+      const customOwner = notes.match(/\[OWNER:(.*?)\]/)?.[1];
+
       return {
         id: p.id,
         name: p.name,
@@ -66,12 +73,13 @@ export class PropertyService {
         occupiedUnits,
         occupancyRate,
         monthlyRevenue,
-        manager: p.manager?.name || 'Sarah Jenkins',
+        manager: p.manager?.name || customMgr || undefined,
         managerDetails: p.manager,
-        owner: p.owner?.name || 'Claire Bennett',
+        owner: p.owner?.name || customOwner || undefined,
         ownerDetails: p.owner,
-        code: `PR-${String(p.id).padStart(2, '0')}`,
-        category: p.type,
+        code: customCode || `PR-${String(p.id).padStart(2, '0')}`,
+        category: customCategory || p.type,
+        portfolioGroup: customPortfolio || 'Brooklyn & Queens',
         createdAt: p.createdAt,
       };
     });
@@ -103,10 +111,20 @@ export class PropertyService {
       .filter((u) => u.status === 'Occupied')
       .reduce((sum, u) => sum + Number(u.rentAmount || 0), 0);
 
+    const notes = property.accessNotes || '';
+    const customCode = notes.match(/\[CODE:(.*?)\]/)?.[1];
+    const customCategory = notes.match(/\[CATEGORY:(.*?)\]/)?.[1];
+    const customPortfolio = notes.match(/\[PORTFOLIO:(.*?)\]/)?.[1];
+    const customMgr = notes.match(/\[MGR:(.*?)\]/)?.[1];
+    const customOwner = notes.match(/\[OWNER:(.*?)\]/)?.[1];
+
     return {
       ...property,
-      manager: property.manager?.name || 'Sarah Jenkins',
-      owner: property.owner?.name || 'Claire Bennett',
+      manager: property.manager?.name || customMgr || undefined,
+      owner: property.owner?.name || customOwner || undefined,
+      code: customCode || `PR-${String(property.id).padStart(2, '0')}`,
+      category: customCategory || property.type,
+      portfolioGroup: customPortfolio || 'Brooklyn & Queens',
       totalUnits,
       occupiedUnits,
       occupancyRate,
@@ -147,6 +165,14 @@ export class PropertyService {
       if (ownerUser) resolvedOwnerId = ownerUser.id;
     }
 
+    const metaTags = [];
+    if (data.code) metaTags.push(`[CODE:${data.code}]`);
+    if (data.category) metaTags.push(`[CATEGORY:${data.category}]`);
+    if (data.portfolioGroup) metaTags.push(`[PORTFOLIO:${data.portfolioGroup}]`);
+    if (data.manager) metaTags.push(`[MGR:${data.manager}]`);
+    if (data.owner) metaTags.push(`[OWNER:${data.owner}]`);
+    const packedNotes = [data.accessNotes, ...metaTags].filter(Boolean).join(' ');
+
     const property = await prisma.property.create({
       data: {
         name: data.name,
@@ -160,7 +186,7 @@ export class PropertyService {
         amenities: data.amenities || [],
         managerId: resolvedManagerId,
         ownerId: resolvedOwnerId,
-        accessNotes: data.accessNotes,
+        accessNotes: packedNotes || undefined,
       },
     });
 
@@ -186,10 +212,9 @@ export class PropertyService {
   }
 
   static async updateProperty(id: number, data: any) {
-    const updateData: any = { ...data };
-
-    if (!updateData.managerId && updateData.manager) {
-      const mgrName = String(updateData.manager).trim();
+    let resolvedManagerId = data.managerId ? Number(data.managerId) : undefined;
+    if (!resolvedManagerId && data.manager) {
+      const mgrName = String(data.manager).trim();
       const mgr = await prisma.user.findFirst({
         where: {
           role: 'manager',
@@ -200,13 +225,12 @@ export class PropertyService {
         },
         select: { id: true },
       });
-      if (mgr) {
-        updateData.managerId = mgr.id;
-      }
+      if (mgr) resolvedManagerId = mgr.id;
     }
 
-    if (!updateData.ownerId && updateData.owner) {
-      const ownName = String(updateData.owner).trim();
+    let resolvedOwnerId = data.ownerId && !isNaN(Number(data.ownerId)) && Number(data.ownerId) < 1000000000000 ? Number(data.ownerId) : undefined;
+    if (!resolvedOwnerId && data.owner) {
+      const ownName = String(data.owner).trim();
       const ownerUser = await prisma.user.findFirst({
         where: {
           role: 'owner',
@@ -217,19 +241,34 @@ export class PropertyService {
         },
         select: { id: true },
       });
-      if (ownerUser) {
-        updateData.ownerId = ownerUser.id;
-      }
+      if (ownerUser) resolvedOwnerId = ownerUser.id;
     }
 
-    delete updateData.manager;
-    delete updateData.owner;
-    delete updateData.financials;
-    delete updateData.requirements;
+    const currentProp = await prisma.property.findUnique({ where: { id } });
+    let existingNotes = currentProp?.accessNotes || '';
+    if (data.code) existingNotes = existingNotes.replace(/\[CODE:.*?\]/g, '') + ` [CODE:${data.code}]`;
+    if (data.category) existingNotes = existingNotes.replace(/\[CATEGORY:.*?\]/g, '') + ` [CATEGORY:${data.category}]`;
+    if (data.portfolioGroup) existingNotes = existingNotes.replace(/\[PORTFOLIO:.*?\]/g, '') + ` [PORTFOLIO:${data.portfolioGroup}]`;
+    if (data.manager) existingNotes = existingNotes.replace(/\[MGR:.*?\]/g, '') + ` [MGR:${data.manager}]`;
+    if (data.owner) existingNotes = existingNotes.replace(/\[OWNER:.*?\]/g, '') + ` [OWNER:${data.owner}]`;
+
+    const cleanData: any = {};
+    if (data.name !== undefined) cleanData.name = data.name;
+    if (data.type !== undefined) cleanData.type = data.type;
+    if (data.address !== undefined) cleanData.address = data.address;
+    if (data.city !== undefined) cleanData.city = data.city;
+    if (data.state !== undefined) cleanData.state = data.state;
+    if (data.zipCode !== undefined || data.zip !== undefined) cleanData.zipCode = data.zipCode || data.zip;
+    if (data.yearBuilt !== undefined) cleanData.yearBuilt = data.yearBuilt ? Number(data.yearBuilt) : null;
+    if (data.imageUrl !== undefined) cleanData.imageUrl = data.imageUrl;
+    if (data.amenities !== undefined) cleanData.amenities = data.amenities;
+    cleanData.accessNotes = existingNotes.trim() || undefined;
+    if (resolvedManagerId !== undefined) cleanData.managerId = resolvedManagerId;
+    if (resolvedOwnerId !== undefined) cleanData.ownerId = resolvedOwnerId;
 
     return prisma.property.update({
       where: { id },
-      data: updateData,
+      data: cleanData,
     });
   }
 
