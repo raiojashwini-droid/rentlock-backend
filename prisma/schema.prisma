@@ -1,0 +1,627 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// -------------------------------------------------------------
+// ENUMS
+// -------------------------------------------------------------
+enum UserRole {
+  admin
+  manager
+  owner
+  tenant
+}
+
+enum UnitStatus {
+  Occupied
+  Vacant
+  Maintenance
+  Reserved
+}
+
+enum TenantStatus {
+  Active
+  Pending
+  Notice_Given
+  Past
+}
+
+enum LeaseStatus {
+  Draft
+  Pending_Signature
+  Active
+  Expiring
+  Terminated
+}
+
+enum InvoiceStatus {
+  Pending
+  Paid
+  Overdue
+  Cancelled
+}
+
+enum TicketPriority {
+  Low
+  Medium
+  High
+  Emergency
+}
+
+enum TicketStatus {
+  Open
+  In_Progress
+  Pending_Approval
+  Resolved
+  Closed
+}
+
+enum StallType {
+  Standard_Covered
+  EV_Charging
+  Visitor_Reserved
+  Handicap
+}
+
+enum StallStatus {
+  Assigned
+  Vacant
+}
+
+enum ShiftStatus {
+  On_Duty
+  Off_Duty
+}
+
+// -------------------------------------------------------------
+// USER & RBAC
+// -------------------------------------------------------------
+model User {
+  id            Int             @id @default(autoincrement())
+  email         String          @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          UserRole        @default(manager)
+  avatarUrl     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // RBAC granular overrides
+  permissions   UserPermission?
+
+  // Managed and Owned Assets
+  managedProperties Property[]  @relation("ManagerProperties")
+  ownedProperties   Property[]  @relation("OwnerProperties")
+
+  // Portal Profiles
+  tenantProfile     Tenant?
+  staffProfile      Staff?
+
+  // Relations
+  auditLogs         AuditLog[]
+  broadcastsSent    Broadcast[]
+  sentMessages      Message[]   @relation("SentMessages")
+
+  @@index([email])
+  @@index([role])
+}
+
+model UserPermission {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Simplified Core Capability Matrix
+  canViewTenants      Boolean  @default(true)
+  canAddTenants       Boolean  @default(true)
+  canEditTenants      Boolean  @default(true)
+  canDeleteTenants    Boolean  @default(false)
+
+  canViewProperties   Boolean  @default(true)
+  canAddProperties    Boolean  @default(false)
+  canEditProperties   Boolean  @default(true)
+  canDeleteProperties Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// -------------------------------------------------------------
+// PROPERTIES & PHYSICAL ASSETS
+// -------------------------------------------------------------
+model Property {
+  id              Int          @id @default(autoincrement())
+  name            String
+  type            String       @default("Multi-Family Residential")
+  address         String
+  city            String
+  state           String
+  zipCode         String
+  yearBuilt       Int?
+  imageUrl        String?
+  amenities       Json?        // JSON array e.g. ["Elevator", "Gym", "Pool", "EV Charging"]
+  accessNotes     String?      @db.Text
+
+  // Operational Ownership
+  managerId       Int?
+  manager         User?        @relation("ManagerProperties", fields: [managerId], references: [id], onDelete: SetNull)
+
+  ownerId         Int?
+  owner           User?        @relation("OwnerProperties", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Child collections
+  units           Unit[]
+  leases          Lease[]
+  tenants         Tenant[]
+  tickets         MaintenanceTicket[]
+  parkingStalls   ParkingStall[]
+  visitorPasses   VisitorPass[]
+  staffMembers    Staff[]
+  broadcasts      Broadcast[]
+  expenses        Expense[]
+  documents       PropertyDocument[]
+  preventiveSchedules PreventiveSchedule[]
+  securityDeposits SecurityDeposit[]
+  ledgerAdjustments LedgerAdjustment[]
+
+  @@index([city, state])
+  @@index([managerId])
+  @@index([ownerId])
+}
+
+model Unit {
+  id              Int          @id @default(autoincrement())
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  unitNumber      String
+  floor           Int          @default(1)
+  bedrooms        Int          @default(1)
+  bathrooms       Decimal      @db.Decimal(3, 1) @default(1.0)
+  sqft            Int          @default(750)
+  rentAmount      Decimal      @db.Decimal(10, 2)
+  depositAmount   Decimal      @db.Decimal(10, 2)
+  status          UnitStatus   @default(Vacant)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relations
+  leases          Lease[]
+  tenants         Tenant[]
+  tickets         MaintenanceTicket[]
+  invoices        Invoice[]
+
+  @@unique([propertyId, unitNumber])
+  @@index([propertyId])
+  @@index([status])
+}
+
+// -------------------------------------------------------------
+// TENANTS & LEASING
+// -------------------------------------------------------------
+model Tenant {
+  id                Int          @id @default(autoincrement())
+  userId            Int?         @unique
+  user              User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  propertyId        Int
+  property          Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  unitId            Int?
+  unit              Unit?        @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  name              String
+  email             String
+  phone             String
+  status            TenantStatus @default(Active)
+  emergencyContact  String?
+  vehiclePlate      String?
+  moveInDate        DateTime?
+  moveOutDate       DateTime?
+  privateNotes      String?      @db.Text
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  leases            Lease[]
+  invoices          Invoice[]
+  tickets           MaintenanceTicket[]
+  parkingStalls     ParkingStall[]
+  visitorPasses     VisitorPass[]
+  securityDeposits  SecurityDeposit[]
+  ledgerAdjustments LedgerAdjustment[]
+
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([email])
+}
+
+model Lease {
+  id                Int          @id @default(autoincrement())
+  leaseNumber       String       @unique // LEASE-2026-XXXX
+  propertyId        Int
+  property          Property     @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+
+  unitId            Int
+  unit              Unit         @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  tenantId          Int
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  startDate         DateTime
+  endDate           DateTime
+  monthlyRent       Decimal      @db.Decimal(10, 2)
+  securityDeposit   Decimal      @db.Decimal(10, 2)
+  status            LeaseStatus  @default(Draft)
+  termsText         String?      @db.Text
+  signedAt          DateTime?
+  countersignedAt   DateTime?
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([tenantId])
+}
+
+// -------------------------------------------------------------
+// BILLING, INVOICES, RECEIPTS & EXPENSES
+// -------------------------------------------------------------
+model Invoice {
+  id              Int           @id @default(autoincrement())
+  invoiceNumber   String        @unique // INV-202611-XXXX
+  tenantId        Int
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  unitId          Int
+  unit            Unit          @relation(fields: [unitId], references: [id], onDelete: Restrict)
+
+  description     String        // e.g. "Monthly Rent - November 2026"
+  amount          Decimal       @db.Decimal(10, 2)
+  paidAmount      Decimal       @db.Decimal(10, 2) @default(0)
+  balance         Decimal       @db.Decimal(10, 2)
+  dueDate         DateTime
+  issueDate       DateTime      @default(now())
+  status          InvoiceStatus @default(Pending)
+  paidAt          DateTime?
+  paymentMethod   String?       // "Stripe Card", "ACH Direct", "Check", "Cash Drawer"
+  referenceNotes  String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  receipts        Receipt[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Receipt {
+  id              Int          @id @default(autoincrement())
+  receiptNumber   String       @unique // RCT-8902 or CSH-8902
+  invoiceId       Int
+  invoice         Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  date            DateTime     @default(now())
+  amount          Decimal      @db.Decimal(10, 2)
+  method          String       // "ACH Bank Transfer", "Cash Drawer", "Stripe"
+  status          String       @default("Posted") // Posted, Voided
+  receivedByStaff String?
+  cashDrawerRef   String?
+  auditNotes      String?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([invoiceId])
+  @@index([status])
+}
+
+model SecurityDeposit {
+  id              Int          @id @default(autoincrement())
+  depositNumber   String       @unique // DEP-101
+  tenantId        Int
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  escrowAccountId String       // "CHASE-ESCROW-8910"
+  originalAmount  Decimal      @db.Decimal(10, 2)
+  accruedInterest Decimal      @db.Decimal(10, 2) @default(0)
+  totalHeld       Decimal      @db.Decimal(10, 2)
+  deductionAmount Decimal      @db.Decimal(10, 2) @default(0)
+  deductionReason String?
+  refundedAmount  Decimal      @db.Decimal(10, 2) @default(0)
+  status          String       @default("Held in Escrow") // "Held in Escrow", "Disposition Due", "Refunded"
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model LedgerAdjustment {
+  id              Int          @id @default(autoincrement())
+  tenantId        Int
+  tenant          Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type            String       // "Credit (Concession)", "Late Fee Waiver", "Debit Charge"
+  amount          Decimal      @db.Decimal(10, 2)
+  reason          String
+
+  createdAt       DateTime     @default(now())
+
+  @@index([tenantId])
+  @@index([propertyId])
+}
+
+model Expense {
+  id              Int          @id @default(autoincrement())
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  vendorId        Int?
+  vendor          Vendor?      @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  category        String       // "HVAC Maintenance", "Landscaping", "Plumbing"
+  description     String
+  amount          Decimal      @db.Decimal(10, 2)
+  date            DateTime     @default(now())
+  isPaid          Boolean      @default(false)
+  paidAt          DateTime?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([propertyId])
+  @@index([category])
+}
+
+// -------------------------------------------------------------
+// MAINTENANCE & WORK ORDERS
+// -------------------------------------------------------------
+model MaintenanceTicket {
+  id              Int            @id @default(autoincrement())
+  ticketNumber    String         @unique // TKT-XXXX
+  propertyId      Int
+  property        Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  unitId          Int?
+  unit            Unit?          @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  tenantId        Int?
+  tenant          Tenant?        @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  title           String
+  description     String         @db.Text
+  category        String         // "Plumbing", "Electrical", "Heating", "Appliances"
+  priority        TicketPriority @default(Medium)
+  status          TicketStatus   @default(Open)
+
+  costEstimate    Decimal?       @db.Decimal(10, 2)
+  adminApproved   Boolean        @default(false)
+
+  assignedStaffId Int?
+  assignedStaff   Staff?         @relation(fields: [assignedStaffId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([propertyId])
+  @@index([status])
+  @@index([priority])
+}
+
+model PreventiveSchedule {
+  id              Int          @id @default(autoincrement())
+  scheduleNumber  String       @unique // PM-01
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  title           String
+  category        String       // "HVAC", "Plumbing", "Fire Safety", "Elevator"
+  vendor          String
+  frequency       String       // "Monthly", "Quarterly", "Semi-Annual", "Annual"
+  nextDue         DateTime
+  costCap         Decimal      @db.Decimal(10, 2) @default(500)
+  status          String       @default("Scheduled")
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([propertyId])
+  @@index([nextDue])
+}
+
+model PropertyDocument {
+  id              Int          @id @default(autoincrement())
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name            String
+  category        String       // "Floor Plans", "Inspection Reports", "Insurance"
+  fileUrl         String
+  uploadedBy      String
+
+  createdAt       DateTime     @default(now())
+
+  @@index([propertyId])
+}
+
+// -------------------------------------------------------------
+// OPERATIONS, FACILITIES, VENDORS, PARKING & MESSAGING
+// -------------------------------------------------------------
+model Vendor {
+  id                Int          @id @default(autoincrement())
+  name              String
+  category          String       // "HVAC Solutions", "Security Systems", "Plumbing"
+  phone             String
+  email             String
+  coiVerified       Boolean      @default(true)
+  w9OnFile          Boolean      @default(true)
+  paymentTerms      String       @default("Net 30")
+  bankAccountMasked String?      // "****4912"
+  isActive          Boolean      @default(true)
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  expenses          Expense[]
+
+  @@index([category])
+}
+
+model ParkingStall {
+  id                   Int          @id @default(autoincrement())
+  stallNumber          String       // "P-101", "P-102 (EV)"
+  propertyId           Int
+  property             Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  stallType            StallType    @default(Standard_Covered)
+  status               StallStatus  @default(Vacant)
+  monthlyFee           Decimal      @db.Decimal(8, 2) @default(150.00)
+
+  assignedTenantId     Int?
+  assignedTenant       Tenant?      @relation(fields: [assignedTenantId], references: [id], onDelete: SetNull)
+
+  assignedVehiclePlate String?      // "NY - KJH-6821"
+
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@unique([propertyId, stallNumber])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model VisitorPass {
+  id              Int          @id @default(autoincrement())
+  passCode        String       @unique // V-PASS-0921
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  hostTenantId    Int
+  hostTenant      Tenant       @relation(fields: [hostTenantId], references: [id], onDelete: Cascade)
+
+  unitNumber      String
+  guestName       String
+  guestPhone      String?
+  guestPlate      String?
+  entryMethod     String       @default("Front Desk / Intercom")
+  expiresAt       DateTime
+  isCheckedIn     Boolean      @default(true)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([propertyId])
+  @@index([expiresAt])
+}
+
+model Staff {
+  id              Int          @id @default(autoincrement())
+  userId          Int?         @unique
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  propertyId      Int
+  property        Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  name            String
+  roleTitle       String       // "Lead Maintenance Tech", "Security Concierge"
+  phone           String
+  email           String
+  shiftStatus     ShiftStatus  @default(Off_Duty)
+  fobKeyId        String?      // "FOB-8821"
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  assignedTickets MaintenanceTicket[]
+
+  @@index([propertyId])
+  @@index([shiftStatus])
+}
+
+model Broadcast {
+  id              Int          @id @default(autoincrement())
+  broadcastNumber String       @unique // BC-101
+  propertyId      Int?         // NULL = Portfolio-wide
+  property        Property?    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  title           String
+  content         String       @db.Text
+  targetAudience  String       @default("All Building Residents")
+  isUrgent        Boolean      @default(false)
+  sentByUserId    Int
+  sentByUser      User         @relation(fields: [sentByUserId], references: [id], onDelete: Restrict)
+
+  createdAt       DateTime     @default(now())
+
+  @@index([propertyId])
+  @@index([createdAt])
+}
+
+model MessageThread {
+  id              Int          @id @default(autoincrement())
+  subject         String?
+  propertyId      Int?
+  participant1Id  Int
+  participant2Id  Int
+  lastMessageAt   DateTime     @default(now())
+
+  messages        Message[]
+
+  createdAt       DateTime     @default(now())
+
+  @@index([participant1Id])
+  @@index([participant2Id])
+}
+
+model Message {
+  id              Int           @id @default(autoincrement())
+  threadId        Int
+  thread          MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId        Int
+  sender          User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  content         String        @db.Text
+  attachmentUrls  String?       // JSON stringified array of URLs
+  isRead          Boolean       @default(false)
+
+  createdAt       DateTime      @default(now())
+
+  @@index([threadId])
+  @@index([senderId])
+}
+
+// -------------------------------------------------------------
+// GOVERNANCE & AUDIT TRAIL
+// -------------------------------------------------------------
+model AuditLog {
+  id              Int          @id @default(autoincrement())
+  auditId         String       @unique // AUD-1731748293
+  userId          Int?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  userLabel       String       // "Robert King (Admin)"
+  action          String       // "Updated Account Permissions"
+  target          String       // "Sarah Jenkins (manager)"
+  beforeAfter     String?      // "canDeleteTenants: false -> true"
+  reason          String       // Mandatory audit justification
+
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
