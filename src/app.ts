@@ -9,19 +9,53 @@ import { sendSuccess, sendError } from './utils/response.js';
 
 export const app = express();
 
+// ============================================================================
+// Frontend URLs / Allowed Origins for CORS
+// Yahan aap jitni bhi frontend URLs lagana chahe, is array me add kar sakte hain:
+// ============================================================================
+export const ALLOWED_ORIGINS: string[] = [
+  'http://localhost:5173', // Vite Frontend (Default)
+  'http://localhost:5174', // Vite Frontend (Alternative port)
+  'http://localhost:3000', // React / Next.js
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:3000',
+  'property-rentlock.netlify.app'
+  // Nayi URLs yahan add kar sakte hain:
+  // 'https://your-frontend-domain.com',
+  // 'https://admin.yourdomain.com',
+];
+
 // Security & Utility Middlewares
 app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow localhost and specified CORS_ORIGIN
-      if (!origin || origin.includes('localhost') || origin === env.CORS_ORIGIN) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive in dev mode
+      // Allow requests with no origin (e.g. mobile apps, curl, Postman, server-to-server)
+      if (!origin) {
+        return callback(null, true);
       }
+
+      // Check if origin is in ALLOWED_ORIGINS
+      const isAllowed = ALLOWED_ORIGINS.some(
+        (url) => url.toLowerCase() === origin.toLowerCase()
+      );
+
+      // Allow matching origins or any localhost/127.0.0.1
+      if (isAllowed || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        return callback(null, true);
+      }
+
+      // In development mode, allow to prevent unexpected blocks
+      if (env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS policy blocked access from origin: ${origin}`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   })
 );
 app.use(express.json({ limit: '10mb' }));
