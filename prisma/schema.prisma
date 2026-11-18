@@ -110,6 +110,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@map("user")
 }
 
 model UserPermission {
@@ -130,6 +131,8 @@ model UserPermission {
 
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+
+  @@map("userpermission")
 }
 
 // -------------------------------------------------------------
@@ -176,6 +179,7 @@ model Property {
   @@index([city, state])
   @@index([managerId])
   @@index([ownerId])
+  @@map("property")
 }
 
 model Unit {
@@ -204,6 +208,7 @@ model Unit {
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
   @@index([status])
+  @@map("unit")
 }
 
 // -------------------------------------------------------------
@@ -244,6 +249,7 @@ model Tenant {
   @@index([propertyId])
   @@index([unitId])
   @@index([email])
+  @@map("tenant")
 }
 
 model Lease {
@@ -273,6 +279,7 @@ model Lease {
   @@index([propertyId])
   @@index([unitId])
   @@index([tenantId])
+  @@map("lease")
 }
 
 // -------------------------------------------------------------
@@ -306,6 +313,7 @@ model Invoice {
   @@index([tenantId])
   @@index([status])
   @@index([dueDate])
+  @@map("invoice")
 }
 
 model Receipt {
@@ -326,6 +334,7 @@ model Receipt {
 
   @@index([invoiceId])
   @@index([status])
+  @@map("receipt")
 }
 
 model SecurityDeposit {
@@ -350,6 +359,7 @@ model SecurityDeposit {
   @@index([tenantId])
   @@index([propertyId])
   @@index([status])
+  @@map("securitydeposit")
 }
 
 model LedgerAdjustment {
@@ -366,6 +376,7 @@ model LedgerAdjustment {
 
   @@index([tenantId])
   @@index([propertyId])
+  @@map("ledgeradjustment")
 }
 
 model Expense {
@@ -388,6 +399,7 @@ model Expense {
 
   @@index([propertyId])
   @@index([category])
+  @@map("expense")
 }
 
 // -------------------------------------------------------------
@@ -423,6 +435,7 @@ model MaintenanceTicket {
   @@index([propertyId])
   @@index([status])
   @@index([priority])
+  @@map("maintenanceticket")
 }
 
 model PreventiveSchedule {
@@ -443,6 +456,7 @@ model PreventiveSchedule {
 
   @@index([propertyId])
   @@index([nextDue])
+  @@map("preventiveschedule")
 }
 
 model PropertyDocument {
@@ -457,6 +471,7 @@ model PropertyDocument {
   createdAt       DateTime     @default(now())
 
   @@index([propertyId])
+  @@map("propertydocument")
 }
 
 // -------------------------------------------------------------
@@ -480,6 +495,7 @@ model Vendor {
   expenses          Expense[]
 
   @@index([category])
+  @@map("vendor")
 }
 
 model ParkingStall {
@@ -503,6 +519,7 @@ model ParkingStall {
   @@unique([propertyId, stallNumber])
   @@index([propertyId])
   @@index([status])
+  @@map("parkingstall")
 }
 
 model VisitorPass {
@@ -527,6 +544,7 @@ model VisitorPass {
 
   @@index([propertyId])
   @@index([expiresAt])
+  @@map("visitorpass")
 }
 
 model Staff {
@@ -551,6 +569,7 @@ model Staff {
 
   @@index([propertyId])
   @@index([shiftStatus])
+  @@map("staff")
 }
 
 model Broadcast {
@@ -570,6 +589,7 @@ model Broadcast {
 
   @@index([propertyId])
   @@index([createdAt])
+  @@map("broadcast")
 }
 
 model MessageThread {
@@ -586,6 +606,7 @@ model MessageThread {
 
   @@index([participant1Id])
   @@index([participant2Id])
+  @@map("messagethread")
 }
 
 model Message {
@@ -602,6 +623,7 @@ model Message {
 
   @@index([threadId])
   @@index([senderId])
+  @@map("message")
 }
 
 // -------------------------------------------------------------
@@ -624,4 +646,5 @@ model AuditLog {
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+  @@map("auditlog")
 }
