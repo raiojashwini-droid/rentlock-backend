@@ -188,6 +188,16 @@ export class OperationController {
     }
   }
 
+  static async updateStaff(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const staff = await OperationService.updateStaff(id, req.body);
+      return sendSuccess(res, staff, 'Staff member updated successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async toggleStaffShift(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);

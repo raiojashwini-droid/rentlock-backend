@@ -40,12 +40,34 @@ export const createVisitorPassSchema = z.object({
 });
 
 export const createStaffSchema = z.object({
-  propertyId: z.number().int(),
-  name: z.string().min(2),
-  roleTitle: z.string().min(2),
-  phone: z.string(),
-  email: z.string().email(),
-  fobKeyId: z.string().optional(),
+  propertyId: z.coerce.number().int().positive('Please select a valid property'),
+  name: z.string().min(2, 'Staff full name is required'),
+  roleTitle: z.string().optional(),
+  role: z.string().optional(),
+  phone: z.string().optional().default(''),
+  email: z.string().email('Valid email address is required'),
+  fobKeyId: z.string().optional().nullable(),
+  keyFobId: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
+  shift: z.string().optional().nullable(),
+  activeKeys: z.string().optional().nullable(),
+}).refine((data) => Boolean(data.roleTitle || data.role), {
+  message: 'Role / Title is required',
+  path: ['roleTitle'],
+});
+
+export const updateStaffSchema = z.object({
+  propertyId: z.coerce.number().int().positive().optional(),
+  name: z.string().min(2).optional(),
+  roleTitle: z.string().optional(),
+  role: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional(),
+  fobKeyId: z.string().optional().nullable(),
+  keyFobId: z.string().optional().nullable(),
+  department: z.string().optional().nullable(),
+  shift: z.string().optional().nullable(),
+  activeKeys: z.string().optional().nullable(),
 });
 
 export const toggleShiftSchema = z.object({
