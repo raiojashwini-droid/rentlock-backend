@@ -1,6 +1,93 @@
 import { prisma } from '../config/database.js';
 
 export class UnitService {
+  private static tableInitialized = false;
+
+  private static async ensureUnitTypeTable() {
+    if (this.tableInitialized) return;
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS unittype (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(191) UNIQUE NOT NULL,
+          createdAt DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
+          updatedAt DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+        );
+      `);
+      this.tableInitialized = true;
+    } catch (err: any) {
+      console.warn('[UnitService] ensureUnitTypeTable error:', err.message);
+    }
+  }
+
+  static async getUnitTypes(): Promise<string[]> {
+    await this.ensureUnitTypeTable();
+    try {
+      const rows: any = await prisma.$queryRawUnsafe(`
+        SELECT name FROM unittype ORDER BY id ASC;
+      `);
+      if (Array.isArray(rows) && rows.length > 0) {
+        return rows.map((r: any) => r.name);
+      }
+    } catch (err: any) {
+      console.warn('[UnitService] getUnitTypes query error:', err.message);
+    }
+
+    const defaults = [
+      'Studio',
+      '1 BD / 1 BA',
+      '2 BD / 1 BA',
+      '2 BD / 2 BA',
+      '3 BD / 2 BA',
+      '3 BD / 2.5 BA',
+      '4+ BD Villa',
+      'Commercial Suite',
+      'Warehouse Bay',
+    ];
+
+    for (const d of defaults) {
+      try {
+        await prisma.$executeRawUnsafe(`
+          INSERT IGNORE INTO unittype (name) VALUES (?);
+        `, d);
+      } catch {}
+    }
+
+    return defaults;
+  }
+
+  static async addUnitType(name: string): Promise<string[]> {
+    await this.ensureUnitTypeTable();
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Unit type name is required');
+
+    try {
+      await prisma.$executeRawUnsafe(`
+        INSERT IGNORE INTO unittype (name) VALUES (?);
+      `, trimmed);
+    } catch (err: any) {
+      console.warn('[UnitService] addUnitType error:', err.message);
+    }
+
+    return this.getUnitTypes();
+  }
+
+  static async removeUnitType(name: string): Promise<string[]> {
+    await this.ensureUnitTypeTable();
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Unit type name is required');
+
+    try {
+      await prisma.$executeRawUnsafe(`
+        DELETE FROM unittype WHERE name = ?;
+      `, trimmed);
+    } catch (err: any) {
+      console.warn('[UnitService] removeUnitType error:', err.message);
+    }
+
+    return this.getUnitTypes();
+  }
+
   static async listUnits(query: any) {
     const where: any = {};
 
@@ -36,14 +123,21 @@ export class UnitService {
       }),
     ]);
 
-    const enrichedItems = items.map((u) => ({
-      ...u,
-      propertyName: u.property?.name || 'General Portfolio',
-      tenant: u.tenants?.[0]?.name || null,
-      size: u.sqft,
-      rent: Number(u.rentAmount),
-      deposit: Number(u.depositAmount),
-    }));
+    const enrichedItems = items.map((u) => {
+      const beds = u.bedrooms ?? 1;
+      const baths = Number(u.bathrooms ?? 1);
+      return {
+        ...u,
+        propertyName: u.property?.name || 'General Portfolio',
+        tenant: u.tenants?.[0]?.name || null,
+        size: u.sqft,
+        rent: Number(u.rentAmount),
+        deposit: Number(u.depositAmount),
+        beds,
+        baths,
+        bhk: `${beds} BD / ${baths} BA`,
+      };
+    });
 
     return { items: enrichedItems, total, page, limit };
   }
@@ -62,6 +156,9 @@ export class UnitService {
 
     if (!unit) throw new Error('Unit not found');
 
+    const beds = unit.bedrooms ?? 1;
+    const baths = Number(unit.bathrooms ?? 1);
+
     return {
       ...unit,
       propertyName: unit.property?.name || 'General Portfolio',
@@ -69,6 +166,9 @@ export class UnitService {
       size: unit.sqft,
       rent: Number(unit.rentAmount),
       deposit: Number(unit.depositAmount),
+      beds,
+      baths,
+      bhk: `${beds} BD / ${baths} BA`,
     };
   }
 
@@ -96,8 +196,8 @@ export class UnitService {
     const deposit = Number(data.depositAmount || data.deposit || rent);
     const sqft = Number(data.sqft || data.size || 900);
     const floor = Number(data.floor || 1);
-    const bedrooms = Number(data.bedrooms || 1);
-    const bathrooms = Number(data.bathrooms || 1);
+    const bedrooms = Number(data.bedrooms ?? data.beds ?? 1);
+    const bathrooms = Number(data.bathrooms ?? data.baths ?? 1);
 
     return prisma.unit.create({
       data: {

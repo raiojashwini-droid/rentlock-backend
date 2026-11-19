@@ -50,4 +50,33 @@ export class UnitController {
       return next(error);
     }
   }
+
+  static async getTypes(req: Request, res: Response, next: NextFunction) {
+    try {
+      const types = await UnitService.getUnitTypes();
+      return sendSuccess(res, types);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async addType(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name } = req.body;
+      const types = await UnitService.addUnitType(name);
+      return sendSuccess(res, types, 'Unit type added successfully', 201);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async removeType(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name } = req.params;
+      const types = await UnitService.removeUnitType(decodeURIComponent(name));
+      return sendSuccess(res, types, 'Unit type removed successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
