@@ -140,6 +140,39 @@ export class OperationService {
     return { success: true, name: target };
   }
 
+  // -------------------- STAFF DEPARTMENTS --------------------
+  private static customDepartments: Set<string> = new Set([
+    'Facilities & Repairs',
+    'Resident Services',
+    'Building Safety',
+    'Operations & Cleaning',
+    'Management & Admin',
+  ]);
+
+  static async listDepartments() {
+    return Array.from(OperationService.customDepartments).map((name) => ({
+      name,
+    }));
+  }
+
+  static async createDepartment(name: string) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Department name is required');
+    OperationService.customDepartments.add(trimmed);
+    return { name: trimmed };
+  }
+
+  static async deleteDepartment(nameOrId: string) {
+    const target = decodeURIComponent(nameOrId).trim();
+    for (const dep of OperationService.customDepartments) {
+      if (dep.toLowerCase() === target.toLowerCase()) {
+        OperationService.customDepartments.delete(dep);
+        break;
+      }
+    }
+    return { success: true, name: target };
+  }
+
   // -------------------- PARKING --------------------
   static async listParkingStalls(query: any) {
     const where: any = {};
