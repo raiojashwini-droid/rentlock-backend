@@ -74,20 +74,14 @@ export class PortalService {
   }
 
   // -------------------- TENANT PORTAL --------------------
-  static async getTenantBalance(tenantUserId: number) {
-    let tenant = await prisma.tenant.findUnique({
-      where: { userId: tenantUserId },
-      include: {
-        property: true,
-        unit: true,
-        leases: { where: { status: 'Active' }, take: 1 },
-        invoices: { where: { status: 'Pending' }, orderBy: { dueDate: 'asc' } },
-        securityDeposits: { take: 1 },
-      },
-    });
+  static async resolveTenant(user: any) {
+    const userId = typeof user === 'number' ? user : (user?.id ? Number(user.id) : null);
+    const email = typeof user === 'object' && user?.email ? String(user.email).toLowerCase().trim() : null;
+    const name = typeof user === 'object' && user?.name ? String(user.name).trim() : null;
 
-    if (!tenant) {
-      tenant = await prisma.tenant.findFirst({
+    if (userId) {
+      const byUser = await prisma.tenant.findUnique({
+        where: { userId },
         include: {
           property: true,
           unit: true,
@@ -96,7 +90,42 @@ export class PortalService {
           securityDeposits: { take: 1 },
         },
       });
+      if (byUser) return byUser;
     }
+
+    if (email) {
+      const byEmail = await prisma.tenant.findFirst({
+        where: { email },
+        include: {
+          property: true,
+          unit: true,
+          leases: { where: { status: 'Active' }, take: 1 },
+          invoices: { where: { status: 'Pending' }, orderBy: { dueDate: 'asc' } },
+          securityDeposits: { take: 1 },
+        },
+      });
+      if (byEmail) return byEmail;
+    }
+
+    if (name) {
+      const byName = await prisma.tenant.findFirst({
+        where: { name },
+        include: {
+          property: true,
+          unit: true,
+          leases: { where: { status: 'Active' }, take: 1 },
+          invoices: { where: { status: 'Pending' }, orderBy: { dueDate: 'asc' } },
+          securityDeposits: { take: 1 },
+        },
+      });
+      if (byName) return byName;
+    }
+
+    return null;
+  }
+
+  static async getTenantBalance(user: any) {
+    const tenant = await PortalService.resolveTenant(user);
 
     if (!tenant) {
       return {
@@ -118,7 +147,7 @@ export class PortalService {
         id: tenant.id,
         name: tenant.name,
         email: tenant.email,
-        unitNumber: tenant.unit?.unitNumber || 'A-204',
+        unitNumber: tenant.unit?.unitNumber || '2A',
         propertyName: tenant.property.name,
       },
       currentBalanceDue: totalBalanceDue,
@@ -136,8 +165,8 @@ export class PortalService {
     };
   }
 
-  static async submitTenantPayment(data: any, tenantUserId: number) {
-    const tenant = await prisma.tenant.findUnique({ where: { userId: tenantUserId } });
+  static async submitTenantPayment(data: any, user: any) {
+    const tenant = await PortalService.resolveTenant(user);
     if (!tenant) {
       return {
         tenant: null,
@@ -185,11 +214,8 @@ export class PortalService {
     return { invoice: updatedInvoice, receipt };
   }
 
-  static async submitTenantWorkOrder(data: any, tenantUserId: number) {
-    const tenant = await prisma.tenant.findUnique({
-      where: { userId: tenantUserId },
-      include: { property: true, unit: true },
-    });
+  static async submitTenantWorkOrder(data: any, user: any) {
+    const tenant = await PortalService.resolveTenant(user);
 
     if (!tenant) {
       return {

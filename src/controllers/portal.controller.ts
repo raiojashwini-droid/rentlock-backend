@@ -48,8 +48,8 @@ export class PortalController {
   // Tenant
   static async getTenantBalance(req: Request, res: Response, next: NextFunction) {
     try {
-      const tenantUserId = req.user?.id || 4;
-      const data = await PortalService.getTenantBalance(tenantUserId);
+      const userPayload = req.user || req.query;
+      const data = await PortalService.getTenantBalance(userPayload);
       return sendSuccess(res, data);
     } catch (error) {
       return next(error);
@@ -58,8 +58,8 @@ export class PortalController {
 
   static async submitTenantPayment(req: Request, res: Response, next: NextFunction) {
     try {
-      const tenantUserId = req.user?.id || 4;
-      const result = await PortalService.submitTenantPayment(req.body, tenantUserId);
+      const userPayload = req.user || req.body;
+      const result = await PortalService.submitTenantPayment(req.body, userPayload);
       return sendSuccess(res, result, 'Rent payment posted successfully');
     } catch (error) {
       return next(error);
@@ -68,8 +68,8 @@ export class PortalController {
 
   static async submitTenantWorkOrder(req: Request, res: Response, next: NextFunction) {
     try {
-      const tenantUserId = req.user?.id || 4;
-      const ticket = await PortalService.submitTenantWorkOrder(req.body, tenantUserId);
+      const userPayload = req.user || req.body;
+      const ticket = await PortalService.submitTenantWorkOrder(req.body, userPayload);
       return sendSuccess(res, ticket, 'Maintenance request submitted', 201);
     } catch (error) {
       return next(error);
