@@ -207,13 +207,35 @@ export class OperationService {
   }
 
   static async createParkingStall(data: any) {
+    let stallType = 'Standard_Covered';
+    const rawType = (data.spotType || data.stallType || '').toLowerCase();
+    if (rawType.includes('ev')) stallType = 'EV_Charging';
+    else if (rawType.includes('visitor')) stallType = 'Visitor_Reserved';
+    else if (rawType.includes('handicap')) stallType = 'Handicap';
+
+    let resolvedPropertyId = Number(data.propertyId);
+    if (!resolvedPropertyId || isNaN(resolvedPropertyId)) {
+      if (data.propertyName) {
+        const prop = await prisma.property.findFirst({
+          where: { name: { contains: String(data.propertyName) } },
+          select: { id: true },
+        });
+        if (prop) resolvedPropertyId = prop.id;
+      }
+      if (!resolvedPropertyId) {
+        const firstProp = await prisma.property.findFirst({ select: { id: true } });
+        resolvedPropertyId = firstProp ? firstProp.id : 1;
+      }
+    }
+
     return prisma.parkingStall.create({
       data: {
-        propertyId: data.propertyId,
-        stallNumber: data.stallNumber,
-        stallType: data.stallType || 'Standard_Covered',
-        monthlyFee: data.monthlyFee || 150,
-        status: 'Vacant',
+        propertyId: resolvedPropertyId,
+        stallNumber: String(data.stallNumber || data.spotNumber || 'P-101'),
+        stallType: stallType as any,
+        monthlyFee: Number(data.monthlyFee) || 150,
+        status: (data.status === 'Assigned' || data.assignedResident || (data.unitNumber && data.unitNumber !== 'Unassigned')) ? 'Assigned' : 'Vacant',
+        assignedVehiclePlate: data.assignedVehiclePlate || data.licensePlate || null,
       },
     });
   }

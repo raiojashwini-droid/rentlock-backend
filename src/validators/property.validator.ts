@@ -14,6 +14,7 @@ export const createPropertySchema = z.object({
   ownerId: z.number().int().optional(),
   accessNotes: z.string().optional(),
   units: z.array(z.any()).optional(),
+  parkingStalls: z.array(z.any()).optional(),
 }).passthrough();
 
 export const updatePropertySchema = createPropertySchema.partial();
