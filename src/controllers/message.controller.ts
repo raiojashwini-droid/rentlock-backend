@@ -23,6 +23,17 @@ export class MessageController {
     }
   }
 
+  static async getMessagesByContact(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user) throw new Error('Unauthorized');
+      const contactId = parseInt(req.params.contactId, 10);
+      const result = await MessageService.getMessagesByContact(contactId, req.user);
+      return sendSuccess(res, result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user) throw new Error('Unauthorized');

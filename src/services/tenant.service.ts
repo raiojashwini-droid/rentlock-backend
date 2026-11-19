@@ -47,6 +47,7 @@ export class TenantService {
 
     const enriched = items.map((t) => ({
       id: t.id,
+      userId: t.userId,
       name: t.name,
       email: t.email,
       phone: t.phone,
