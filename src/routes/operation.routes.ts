@@ -43,6 +43,9 @@ router.post('/visitors', validateBody(createVisitorPassSchema), OperationControl
 router.patch('/visitors/:id/checkout', OperationController.checkoutVisitor);
 
 // Staff
+router.get('/departments', OperationController.listDepartments);
+router.post('/departments', OperationController.createDepartment);
+router.delete('/departments/:id', OperationController.deleteDepartment);
 router.get('/staff', OperationController.listStaff);
 router.post('/staff', validateBody(createStaffSchema), OperationController.createStaff);
 router.put('/staff/:id', validateBody(updateStaffSchema), OperationController.updateStaff);

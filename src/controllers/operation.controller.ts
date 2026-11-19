@@ -84,6 +84,34 @@ export class OperationController {
     }
   }
 
+  // Staff Departments
+  static async listDepartments(req: Request, res: Response, next: NextFunction) {
+    try {
+      const departments = await OperationService.listDepartments();
+      return sendSuccess(res, departments);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createDepartment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const department = await OperationService.createDepartment(req.body.name);
+      return sendSuccess(res, department, 'Department created successfully', 201);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteDepartment(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await OperationService.deleteDepartment(req.params.id);
+      return sendSuccess(res, result, 'Department removed successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   // Parking
   static async listParking(req: Request, res: Response, next: NextFunction) {
     try {
