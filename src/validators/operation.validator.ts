@@ -34,7 +34,7 @@ export const createParkingStallSchema = z.object({
 }).passthrough();
 
 export const assignParkingStallSchema = z.object({
-  tenantId: z.number().int().optional().nullable(),
+  tenantId: z.coerce.number().int().optional().nullable(),
   vehiclePlate: z.string().optional().nullable(),
   unitNumber: z.string().optional(),
   assignedResident: z.string().optional(),

@@ -206,9 +206,9 @@ export class OperationService {
       status: s.status,
       monthlyFee: Number(s.monthlyFee),
       assignedTenantId: s.assignedTenantId,
-      assignedResident: s.assignedTenant?.name || null,
+      assignedResident: s.assignedTenant?.name || (s.status === 'Assigned' ? 'Assigned' : null),
       assignedTenantName: s.assignedTenant?.name || null,
-      unitNumber: s.assignedTenant?.unit?.unitNumber || 'Unassigned',
+      unitNumber: s.assignedTenant?.unit?.unitNumber || (s.status === 'Assigned' ? 'Assigned' : 'Unassigned'),
       assignedVehiclePlate: s.assignedVehiclePlate,
       licensePlate: s.assignedVehiclePlate || '—',
     }));
@@ -267,13 +267,21 @@ export class OperationService {
           if (matchingTenant) resolvedTenantId = matchingTenant.id;
         }
 
+        const updateData: any = {
+          assignedTenantId: resolvedTenantId,
+          assignedVehiclePlate: vehiclePlate || extraData?.licensePlate || null,
+          status: 'Assigned',
+        };
+        if (extraData?.propertyId && !isNaN(Number(extraData.propertyId))) {
+          updateData.propertyId = Number(extraData.propertyId);
+        }
+        if (extraData?.monthlyFee !== undefined && !isNaN(Number(extraData.monthlyFee))) {
+          updateData.monthlyFee = Number(extraData.monthlyFee);
+        }
+
         const updated = await prisma.parkingStall.update({
           where: { id },
-          data: {
-            assignedTenantId: resolvedTenantId,
-            assignedVehiclePlate: vehiclePlate || extraData?.licensePlate || null,
-            status: 'Assigned',
-          },
+          data: updateData,
           include: {
             assignedTenant: {
               include: { unit: true },
