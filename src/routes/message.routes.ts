@@ -10,6 +10,7 @@ router.use(authenticateToken);
 
 router.get('/threads', MessageController.listThreads);
 router.get('/threads/:threadId', MessageController.getThreadMessages);
+router.get('/contact/:contactId', MessageController.getMessagesByContact);
 router.post('/', validateBody(sendMessageSchema), MessageController.sendMessage);
 router.patch('/threads/:threadId/read', MessageController.markRead);
 
