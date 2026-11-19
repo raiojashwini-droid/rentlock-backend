@@ -15,6 +15,8 @@ router.use(authenticateToken);
 router.get('/', LeaseController.list);
 router.get('/:id', LeaseController.getById);
 router.post('/', validateBody(createLeaseSchema), LeaseController.draft);
+router.put('/:id', LeaseController.update);
+router.delete('/:id', LeaseController.delete);
 router.patch('/:id/sign', validateBody(signLeaseSchema), LeaseController.sign);
 router.patch('/:id/terminate', validateBody(terminateLeaseSchema), LeaseController.terminate);
 

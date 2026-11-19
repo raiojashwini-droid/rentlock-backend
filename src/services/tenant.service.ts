@@ -138,16 +138,11 @@ export class TenantService {
         existingProp = await prisma.property.create({
           data: {
             name: data.propertyName || 'HAPPY',
-            code: 'PRP-001',
             type: 'Residential',
             address: '123 Main St',
             city: 'Metro City',
             state: 'NY',
             zipCode: '10001',
-            totalUnits: 3,
-            occupiedUnits: 0,
-            vacantUnits: 3,
-            monthlyRevenue: 0,
           },
         });
         propId = existingProp.id;

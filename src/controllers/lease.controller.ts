@@ -31,6 +31,26 @@ export class LeaseController {
     }
   }
 
+  static async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const lease = await LeaseService.updateLease(id, req.body);
+      return sendSuccess(res, lease, 'Lease updated successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await LeaseService.deleteLease(id);
+      return sendSuccess(res, null, 'Lease deleted successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async sign(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
