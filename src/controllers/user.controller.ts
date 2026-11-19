@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { hashPassword } from '../utils/password.js';
 import { sendSuccess } from '../utils/response.js';
+import { AuthService } from '../services/auth.service.js';
 
 export class UserController {
   static async listOwners(_req: Request, res: Response, next: NextFunction) {
@@ -275,6 +276,14 @@ export class UserController {
       const propList = assignedProperties || properties;
       if (user && Array.isArray(propList)) {
         await UserController.syncManagerProperties(user.id, propList);
+      }
+
+      if (req.body.archived === true || req.body.status === 'Archived') {
+        const targetEmail = cleanEmail || user?.email;
+        if (targetEmail) AuthService.deactivateUser(targetEmail);
+      } else if (req.body.archived === false || req.body.status === 'Active') {
+        const targetEmail = cleanEmail || user?.email;
+        if (targetEmail) AuthService.activateUser(targetEmail);
       }
 
       return sendSuccess(res, user, 'Manager updated successfully');
