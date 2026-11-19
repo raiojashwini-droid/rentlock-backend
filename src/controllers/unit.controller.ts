@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UnitService } from '../services/unit.service.js';
-import { sendSuccess, sendPaginated } from '../utils/response.js';
+import { sendSuccess, sendPaginated, sendError } from '../utils/response.js';
 
 export class UnitController {
   static async list(req: Request, res: Response, next: NextFunction) {
@@ -15,6 +15,9 @@ export class UnitController {
   static async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return sendError(res, 'Invalid unit ID', 400);
+      }
       const unit = await UnitService.getUnitById(id);
       return sendSuccess(res, unit);
     } catch (error) {
@@ -34,6 +37,9 @@ export class UnitController {
   static async update(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return sendError(res, 'Invalid unit ID', 400);
+      }
       const unit = await UnitService.updateUnit(id, req.body);
       return sendSuccess(res, unit, 'Unit updated successfully');
     } catch (error) {
@@ -44,6 +50,9 @@ export class UnitController {
   static async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return sendError(res, 'Invalid unit ID', 400);
+      }
       await UnitService.deleteUnit(id);
       return sendSuccess(res, { id }, 'Unit deleted successfully');
     } catch (error) {

@@ -13,9 +13,9 @@ router.get('/', requirePermission('canViewProperties'), UnitController.list);
 router.get('/types', UnitController.getTypes);
 router.post('/types', UnitController.addType);
 router.delete('/types/:name', UnitController.removeType);
-router.get('/:id', requirePermission('canViewProperties'), UnitController.getById);
+router.get('/:id(\\d+)', requirePermission('canViewProperties'), UnitController.getById);
 router.post('/', requirePermission('canAddProperties'), validateBody(createUnitSchema), UnitController.create);
-router.put('/:id', requirePermission('canEditProperties'), validateBody(updateUnitSchema), UnitController.update);
-router.delete('/:id', requirePermission('canDeleteProperties'), UnitController.delete);
+router.put('/:id(\\d+)', requirePermission('canEditProperties'), validateBody(updateUnitSchema), UnitController.update);
+router.delete('/:id(\\d+)', requirePermission('canDeleteProperties'), UnitController.delete);
 
 export default router;
