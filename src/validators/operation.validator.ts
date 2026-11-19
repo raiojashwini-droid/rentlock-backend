@@ -34,9 +34,16 @@ export const createParkingStallSchema = z.object({
 }).passthrough();
 
 export const assignParkingStallSchema = z.object({
-  tenantId: z.number().int(),
-  vehiclePlate: z.string().min(2, 'Vehicle plate is required'),
-});
+  tenantId: z.number().int().optional().nullable(),
+  vehiclePlate: z.string().optional().nullable(),
+  unitNumber: z.string().optional(),
+  assignedResident: z.string().optional(),
+  propertyName: z.string().optional(),
+  propertyId: z.union([z.number(), z.string()]).optional(),
+  licensePlate: z.string().optional(),
+  permitTag: z.string().optional(),
+  monthlyFee: z.union([z.number(), z.string()]).optional(),
+}).passthrough();
 
 export const createVisitorPassSchema = z.object({
   propertyId: z.number().int(),

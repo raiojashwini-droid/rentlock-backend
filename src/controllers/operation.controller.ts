@@ -136,8 +136,8 @@ export class OperationController {
       const rawId = req.params.id;
       const digits = String(rawId).replace(/\D/g, '');
       const id = digits ? parseInt(digits, 10) : parseInt(rawId, 10);
-      const { tenantId, vehiclePlate } = req.body;
-      const stall = await OperationService.assignParkingStall(id, tenantId, vehiclePlate);
+      const { tenantId, vehiclePlate, ...extraData } = req.body;
+      const stall = await OperationService.assignParkingStall(id, tenantId, vehiclePlate, extraData);
       return sendSuccess(res, stall, 'Parking stall assigned to resident');
     } catch (error) {
       return next(error);
