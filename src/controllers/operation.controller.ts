@@ -56,6 +56,34 @@ export class OperationController {
     }
   }
 
+  // Service Categories
+  static async listServiceCategories(req: Request, res: Response, next: NextFunction) {
+    try {
+      const categories = await OperationService.listServiceCategories();
+      return sendSuccess(res, categories);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createServiceCategory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const category = await OperationService.createServiceCategory(req.body.name);
+      return sendSuccess(res, category, 'Service category created successfully', 201);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteServiceCategory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await OperationService.deleteServiceCategory(req.params.id);
+      return sendSuccess(res, result, 'Service category removed successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   // Parking
   static async listParking(req: Request, res: Response, next: NextFunction) {
     try {

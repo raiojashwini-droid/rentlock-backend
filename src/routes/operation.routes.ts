@@ -24,6 +24,11 @@ router.put('/vendors/:id', validateBody(updateVendorSchema), OperationController
 router.delete('/vendors/:id', OperationController.deleteVendor);
 router.post('/vendors/:id/pay', OperationController.disburseVendor);
 
+// Service Categories
+router.get('/service-categories', OperationController.listServiceCategories);
+router.post('/service-categories', OperationController.createServiceCategory);
+router.delete('/service-categories/:id', OperationController.deleteServiceCategory);
+
 // Parking
 router.get('/parking', OperationController.listParking);
 router.post('/parking', validateBody(createParkingStallSchema), OperationController.createParking);

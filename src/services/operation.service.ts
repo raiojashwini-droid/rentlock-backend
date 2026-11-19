@@ -87,6 +87,59 @@ export class OperationService {
     };
   }
 
+  // -------------------- SERVICE CATEGORIES --------------------
+  private static customCategories: Set<string> = new Set([
+    'Plumbing',
+    'Electrical',
+    'HVAC',
+    'Landscaping & Snow',
+    'Fire Safety',
+    'Janitorial',
+    'General Contractor',
+    'Roofing',
+    'Pest Control',
+  ]);
+
+  static async listServiceCategories() {
+    try {
+      const vendors = await prisma.vendor.findMany({ select: { category: true } });
+      const counts: Record<string, number> = {};
+      vendors.forEach((v) => {
+        if (v.category) {
+          counts[v.category] = (counts[v.category] || 0) + 1;
+          OperationService.customCategories.add(v.category);
+        }
+      });
+      return Array.from(OperationService.customCategories).map((name) => ({
+        name,
+        count: counts[name] || 0,
+      }));
+    } catch {
+      return Array.from(OperationService.customCategories).map((name) => ({
+        name,
+        count: 0,
+      }));
+    }
+  }
+
+  static async createServiceCategory(name: string) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Category name is required');
+    OperationService.customCategories.add(trimmed);
+    return { name: trimmed, count: 0 };
+  }
+
+  static async deleteServiceCategory(nameOrId: string) {
+    const target = decodeURIComponent(nameOrId).trim();
+    for (const cat of OperationService.customCategories) {
+      if (cat.toLowerCase() === target.toLowerCase()) {
+        OperationService.customCategories.delete(cat);
+        break;
+      }
+    }
+    return { success: true, name: target };
+  }
+
   // -------------------- PARKING --------------------
   static async listParkingStalls(query: any) {
     const where: any = {};

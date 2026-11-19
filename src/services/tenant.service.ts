@@ -170,15 +170,45 @@ export class TenantService {
   }
 
   static async updateTenant(id: number, data: any) {
-    return prisma.tenant.update({
+    const updateData: any = {};
+    if (data.name !== undefined) updateData.name = String(data.name).trim();
+    if (data.email !== undefined) updateData.email = String(data.email).toLowerCase().trim();
+    if (data.phone !== undefined || data.mobile !== undefined) {
+      updateData.phone = String(data.phone || data.mobile).trim();
+    }
+    if (data.status !== undefined) updateData.status = data.status;
+    if (data.propertyId !== undefined && !isNaN(Number(data.propertyId))) {
+      updateData.propertyId = Number(data.propertyId);
+    }
+    if (data.unitId !== undefined) {
+      updateData.unitId = data.unitId && !isNaN(Number(data.unitId)) ? Number(data.unitId) : null;
+    }
+    if (data.emergencyContact !== undefined) updateData.emergencyContact = data.emergencyContact;
+    if (data.vehiclePlate !== undefined) updateData.vehiclePlate = data.vehiclePlate;
+    if (data.moveInDate !== undefined) {
+      updateData.moveInDate = data.moveInDate ? new Date(data.moveInDate) : null;
+    }
+    if (data.moveOutDate !== undefined) {
+      updateData.moveOutDate = data.moveOutDate ? new Date(data.moveOutDate) : null;
+    }
+    if (data.privateNotes !== undefined || data.notes !== undefined) {
+      updateData.privateNotes = data.privateNotes || data.notes;
+    }
+
+    const updated = await prisma.tenant.update({
       where: { id },
-      data: {
-        ...data,
-        moveInDate: data.moveInDate ? new Date(data.moveInDate) : undefined,
-        moveOutDate: data.moveOutDate ? new Date(data.moveOutDate) : undefined,
-      },
+      data: updateData,
       include: { property: true, unit: true },
     });
+
+    if (updateData.unitId && !isNaN(updateData.unitId)) {
+      await prisma.unit.update({
+        where: { id: updateData.unitId },
+        data: { status: 'Occupied' },
+      }).catch(() => {});
+    }
+
+    return updated;
   }
 
   static async deleteTenant(id: number, actorName = 'Admin') {
