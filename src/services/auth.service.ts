@@ -5,8 +5,21 @@ import { DEFAULT_ROLE_PERMISSIONS } from '../config/constants.js';
 import { AuthUserPayload, EffectivePermissions } from '../types/index.js';
 
 export class AuthService {
+  private static deactivatedEmails: Set<string> = new Set();
+
+  static deactivateUser(email: string) {
+    if (email) AuthService.deactivatedEmails.add(email.trim().toLowerCase());
+  }
+
+  static activateUser(email: string) {
+    if (email) AuthService.deactivatedEmails.delete(email.trim().toLowerCase());
+  }
+
   static async login(email: string, password: string, requestedRole?: string) {
     const cleanEmail = email.trim().toLowerCase();
+    if (AuthService.deactivatedEmails.has(cleanEmail)) {
+      throw new Error('This account has been deactivated / archived. Access is denied.');
+    }
     let user = await prisma.user.findUnique({
       where: { email: cleanEmail },
       include: { permissions: true },
