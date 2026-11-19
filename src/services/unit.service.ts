@@ -26,34 +26,13 @@ export class UnitService {
       const rows: any = await prisma.$queryRawUnsafe(`
         SELECT name FROM unittype ORDER BY id ASC;
       `);
-      if (Array.isArray(rows) && rows.length > 0) {
+      if (Array.isArray(rows)) {
         return rows.map((r: any) => r.name);
       }
     } catch (err: any) {
       console.warn('[UnitService] getUnitTypes query error:', err.message);
     }
-
-    const defaults = [
-      'Studio',
-      '1 BD / 1 BA',
-      '2 BD / 1 BA',
-      '2 BD / 2 BA',
-      '3 BD / 2 BA',
-      '3 BD / 2.5 BA',
-      '4+ BD Villa',
-      'Commercial Suite',
-      'Warehouse Bay',
-    ];
-
-    for (const d of defaults) {
-      try {
-        await prisma.$executeRawUnsafe(`
-          INSERT IGNORE INTO unittype (name) VALUES (?);
-        `, d);
-      } catch {}
-    }
-
-    return defaults;
+    return [];
   }
 
   static async addUnitType(name: string): Promise<string[]> {
