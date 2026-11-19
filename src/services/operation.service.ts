@@ -183,7 +183,14 @@ export class OperationService {
       where,
       include: {
         property: { select: { id: true, name: true } },
-        assignedTenant: { select: { id: true, name: true, phone: true } },
+        assignedTenant: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            unit: { select: { id: true, unitNumber: true } },
+          },
+        },
       },
       orderBy: { stallNumber: 'asc' },
     });
@@ -201,44 +208,89 @@ export class OperationService {
       assignedTenantId: s.assignedTenantId,
       assignedResident: s.assignedTenant?.name || null,
       assignedTenantName: s.assignedTenant?.name || null,
+      unitNumber: s.assignedTenant?.unit?.unitNumber || 'Unassigned',
       assignedVehiclePlate: s.assignedVehiclePlate,
       licensePlate: s.assignedVehiclePlate || '—',
     }));
   }
 
   static async createParkingStall(data: any) {
+    let stallType = 'Standard_Covered';
+    const rawType = (data.spotType || data.stallType || '').toLowerCase();
+    if (rawType.includes('ev')) stallType = 'EV_Charging';
+    else if (rawType.includes('visitor')) stallType = 'Visitor_Reserved';
+    else if (rawType.includes('handicap')) stallType = 'Handicap';
+
+    let resolvedPropertyId = Number(data.propertyId);
+    if (!resolvedPropertyId || isNaN(resolvedPropertyId)) {
+      if (data.propertyName) {
+        const prop = await prisma.property.findFirst({
+          where: { name: { contains: String(data.propertyName) } },
+          select: { id: true },
+        });
+        if (prop) resolvedPropertyId = prop.id;
+      }
+      if (!resolvedPropertyId) {
+        const firstProp = await prisma.property.findFirst({ select: { id: true } });
+        resolvedPropertyId = firstProp ? firstProp.id : 1;
+      }
+    }
+
     return prisma.parkingStall.create({
       data: {
-        propertyId: data.propertyId,
-        stallNumber: data.stallNumber,
-        stallType: data.stallType || 'Standard_Covered',
-        monthlyFee: data.monthlyFee || 150,
-        status: 'Vacant',
+        propertyId: resolvedPropertyId,
+        stallNumber: String(data.stallNumber || data.spotNumber || 'P-101'),
+        stallType: stallType as any,
+        monthlyFee: Number(data.monthlyFee) || 150,
+        status: (data.status === 'Assigned' || data.assignedResident || (data.unitNumber && data.unitNumber !== 'Unassigned')) ? 'Assigned' : 'Vacant',
+        assignedVehiclePlate: data.assignedVehiclePlate || data.licensePlate || null,
       },
     });
   }
 
-  static async assignParkingStall(id: number, tenantId: number, vehiclePlate: string) {
+  static async assignParkingStall(id: number, tenantId?: number | null, vehiclePlate?: string | null, extraData?: any) {
     if (isNaN(id) || !id) {
-      return { id, tenantId, vehiclePlate, status: 'Assigned' };
+      return { id, tenantId, vehiclePlate, status: 'Assigned', ...extraData };
     }
     try {
       const exists = await prisma.parkingStall.findUnique({ where: { id } });
       if (exists) {
-        return await prisma.parkingStall.update({
+        let resolvedTenantId = tenantId ? Number(tenantId) : null;
+        if (!resolvedTenantId && extraData?.unitNumber) {
+          const matchingTenant = await prisma.tenant.findFirst({
+            where: {
+              propertyId: exists.propertyId,
+              unit: { unitNumber: String(extraData.unitNumber) },
+            },
+            select: { id: true },
+          });
+          if (matchingTenant) resolvedTenantId = matchingTenant.id;
+        }
+
+        const updated = await prisma.parkingStall.update({
           where: { id },
           data: {
-            assignedTenantId: tenantId ? Number(tenantId) : null,
-            assignedVehiclePlate: vehiclePlate,
+            assignedTenantId: resolvedTenantId,
+            assignedVehiclePlate: vehiclePlate || extraData?.licensePlate || null,
             status: 'Assigned',
           },
-          include: { assignedTenant: true },
+          include: {
+            assignedTenant: {
+              include: { unit: true },
+            },
+          },
         });
+
+        return {
+          ...updated,
+          unitNumber: updated.assignedTenant?.unit?.unitNumber || extraData?.unitNumber || 'Unassigned',
+          assignedResident: updated.assignedTenant?.name || extraData?.assignedResident || null,
+        };
       }
     } catch (err: any) {
       console.warn('Assign parking DB fallback:', err.message);
     }
-    return { id, tenantId, vehiclePlate, status: 'Assigned' };
+    return { id, tenantId, vehiclePlate, status: 'Assigned', ...extraData };
   }
 
   static async vacateParkingStall(id: number) {

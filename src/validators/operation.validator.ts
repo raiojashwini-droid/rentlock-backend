@@ -17,16 +17,33 @@ export const createVendorSchema = z.object({
 export const updateVendorSchema = createVendorSchema.partial();
 
 export const createParkingStallSchema = z.object({
-  propertyId: z.number().int(),
-  stallNumber: z.string().min(1, 'Stall number is required'),
-  stallType: z.enum(['Standard_Covered', 'EV_Charging', 'Visitor_Reserved', 'Handicap']).default('Standard_Covered'),
-  monthlyFee: z.number().nonnegative().default(150),
-});
+  propertyId: z.coerce.number().int().optional(),
+  stallNumber: z.string().optional(),
+  spotNumber: z.string().optional(),
+  stallType: z.string().optional().default('Standard_Covered'),
+  spotType: z.string().optional(),
+  monthlyFee: z.coerce.number().nonnegative().optional().default(150),
+  propertyName: z.string().optional(),
+  lotLocation: z.string().optional(),
+  assignedResident: z.string().optional().nullable(),
+  unitNumber: z.string().optional(),
+  vehicle: z.string().optional(),
+  licensePlate: z.string().optional(),
+  permitTag: z.string().optional(),
+  status: z.string().optional(),
+}).passthrough();
 
 export const assignParkingStallSchema = z.object({
-  tenantId: z.number().int(),
-  vehiclePlate: z.string().min(2, 'Vehicle plate is required'),
-});
+  tenantId: z.number().int().optional().nullable(),
+  vehiclePlate: z.string().optional().nullable(),
+  unitNumber: z.string().optional(),
+  assignedResident: z.string().optional(),
+  propertyName: z.string().optional(),
+  propertyId: z.union([z.number(), z.string()]).optional(),
+  licensePlate: z.string().optional(),
+  permitTag: z.string().optional(),
+  monthlyFee: z.union([z.number(), z.string()]).optional(),
+}).passthrough();
 
 export const createVisitorPassSchema = z.object({
   propertyId: z.number().int(),

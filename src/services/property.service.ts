@@ -208,6 +208,28 @@ export class PropertyService {
       }
     }
 
+    const stallsInput = data.parkingStalls || data.stalls;
+    if (Array.isArray(stallsInput) && stallsInput.length > 0) {
+      for (const s of stallsInput) {
+        let stallType = 'Standard_Covered';
+        const rawType = (s.spotType || s.stallType || '').toLowerCase();
+        if (rawType.includes('ev')) stallType = 'EV_Charging';
+        else if (rawType.includes('visitor')) stallType = 'Visitor_Reserved';
+        else if (rawType.includes('handicap')) stallType = 'Handicap';
+
+        await prisma.parkingStall.create({
+          data: {
+            propertyId: property.id,
+            stallNumber: String(s.spotNumber || s.stallNumber || 'P-101'),
+            stallType: stallType as any,
+            monthlyFee: Number(s.monthlyFee) || 150,
+            status: (s.assignedResident || (s.unitNumber && s.unitNumber !== 'Unassigned')) ? 'Assigned' : 'Vacant',
+            assignedVehiclePlate: s.licensePlate && s.licensePlate !== '—' ? s.licensePlate : (s.assignedVehiclePlate || null),
+          },
+        }).catch((err) => console.warn('[PropertyService] parkingStall create error:', err.message));
+      }
+    }
+
     return property;
   }
 

@@ -95,7 +95,16 @@ export class UnitService {
         take: limit,
         include: {
           property: { select: { id: true, name: true, city: true, state: true } },
-          tenants: { select: { id: true, name: true, email: true, phone: true, status: true } },
+          tenants: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              status: true,
+              parkingStalls: { select: { id: true, stallNumber: true } },
+            },
+          },
           leases: { where: { status: 'Active' }, take: 1 },
         },
         orderBy: [{ propertyId: 'asc' }, { unitNumber: 'asc' }],
@@ -105,8 +114,10 @@ export class UnitService {
     const enrichedItems = items.map((u) => {
       const beds = u.bedrooms ?? 1;
       const baths = Number(u.bathrooms ?? 1);
+      const parkingSlot = u.tenants?.[0]?.parkingStalls?.[0]?.stallNumber || null;
       return {
         ...u,
+        parkingSlot,
         propertyName: u.property?.name || 'General Portfolio',
         tenant: u.tenants?.[0]?.name || null,
         size: u.sqft,
@@ -126,7 +137,11 @@ export class UnitService {
       where: { id },
       include: {
         property: true,
-        tenants: true,
+        tenants: {
+          include: {
+            parkingStalls: true,
+          },
+        },
         leases: { orderBy: { createdAt: 'desc' } },
         invoices: { orderBy: { dueDate: 'desc' }, take: 10 },
         tickets: { orderBy: { createdAt: 'desc' }, take: 5 },
@@ -137,9 +152,11 @@ export class UnitService {
 
     const beds = unit.bedrooms ?? 1;
     const baths = Number(unit.bathrooms ?? 1);
+    const parkingSlot = unit.tenants?.[0]?.parkingStalls?.[0]?.stallNumber || null;
 
     return {
       ...unit,
+      parkingSlot,
       propertyName: unit.property?.name || 'General Portfolio',
       tenant: unit.tenants?.[0]?.name || null,
       size: unit.sqft,
@@ -178,7 +195,7 @@ export class UnitService {
     const bedrooms = Number(data.bedrooms ?? data.beds ?? 1);
     const bathrooms = Number(data.bathrooms ?? data.baths ?? 1);
 
-    return prisma.unit.create({
+    const createdUnit = await prisma.unit.create({
       data: {
         propertyId: propId,
         unitNumber: String(data.unitNumber || 'A-101'),
@@ -192,6 +209,24 @@ export class UnitService {
       },
       include: { property: true },
     });
+
+    if (data.parkingSlot) {
+      try {
+        await prisma.parkingStall.updateMany({
+          where: {
+            propertyId: propId,
+            stallNumber: String(data.parkingSlot),
+          },
+          data: {
+            status: 'Assigned',
+          },
+        });
+      } catch (err: any) {
+        console.warn('Could not link parking stall on createUnit:', err.message);
+      }
+    }
+
+    return { ...createdUnit, parkingSlot: data.parkingSlot || null };
   }
 
   static async updateUnit(id: number, data: any) {
@@ -211,11 +246,40 @@ export class UnitService {
     }
     if (data.propertyId !== undefined) validData.propertyId = Number(data.propertyId);
 
-    return prisma.unit.update({
+    const updated = await prisma.unit.update({
       where: { id },
       data: validData,
-      include: { property: true },
+      include: {
+        property: true,
+        tenants: {
+          include: { parkingStalls: true },
+        },
+      },
     });
+
+    if (data.parkingSlot !== undefined) {
+      try {
+        const propId = validData.propertyId || updated.propertyId;
+        const tenant = updated.tenants?.[0];
+        if (data.parkingSlot) {
+          await prisma.parkingStall.updateMany({
+            where: {
+              propertyId: propId,
+              stallNumber: String(data.parkingSlot),
+            },
+            data: {
+              assignedTenantId: tenant?.id || null,
+              status: 'Assigned',
+            },
+          });
+        }
+      } catch (err: any) {
+        console.warn('Could not update parking stall on updateUnit:', err.message);
+      }
+    }
+
+    const currentStall = updated.tenants?.[0]?.parkingStalls?.[0]?.stallNumber || data.parkingSlot || null;
+    return { ...updated, parkingSlot: currentStall };
   }
 
   static async deleteUnit(id: number) {
