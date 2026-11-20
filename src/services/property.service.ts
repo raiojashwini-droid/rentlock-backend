@@ -417,4 +417,43 @@ export class PropertyService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  // -------------------- PORTFOLIO GROUPS --------------------
+  private static customPortfolios: Set<string> = new Set([
+    'Brooklyn & Queens',
+    'New Jersey',
+    'Texas Commercial & Resi',
+    'Core East Coast',
+  ]);
+
+  static async listPortfolios() {
+    try {
+      const properties = await prisma.property.findMany({ select: { accessNotes: true } });
+      properties.forEach((p) => {
+        const match = p.accessNotes?.match(/\[PORTFOLIO:(.*?)\]/)?.[1];
+        if (match && match.trim()) {
+          PropertyService.customPortfolios.add(match.trim());
+        }
+      });
+    } catch {}
+    return Array.from(PropertyService.customPortfolios);
+  }
+
+  static async createPortfolio(name: string) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) throw new Error('Portfolio group name is required');
+    PropertyService.customPortfolios.add(trimmed);
+    return { name: trimmed, portfolios: Array.from(PropertyService.customPortfolios) };
+  }
+
+  static async deletePortfolio(name: string) {
+    const target = decodeURIComponent(name).trim().toLowerCase();
+    for (const p of PropertyService.customPortfolios) {
+      if (p.toLowerCase() === target) {
+        PropertyService.customPortfolios.delete(p);
+        break;
+      }
+    }
+    return { success: true, portfolios: Array.from(PropertyService.customPortfolios) };
+  }
 }

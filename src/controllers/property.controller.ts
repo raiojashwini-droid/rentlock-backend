@@ -75,4 +75,32 @@ export class PropertyController {
       return next(error);
     }
   }
+
+  // Portfolio Groups
+  static async listPortfolios(req: Request, res: Response, next: NextFunction) {
+    try {
+      const portfolios = await PropertyService.listPortfolios();
+      return sendSuccess(res, portfolios);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createPortfolio(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await PropertyService.createPortfolio(req.body.name);
+      return sendSuccess(res, result, 'Portfolio group created successfully', 201);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deletePortfolio(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await PropertyService.deletePortfolio(req.params.name);
+      return sendSuccess(res, result, 'Portfolio group removed successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
