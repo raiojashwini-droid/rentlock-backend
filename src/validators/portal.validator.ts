@@ -8,10 +8,12 @@ export const tenantPaymentSchema = z.object({
 });
 
 export const tenantWorkOrderSchema = z.object({
-  category: z.string().default('General'),
-  issueLocation: z.string().min(3),
-  accessTime: z.string().default('Anytime during business hours'),
-  description: z.string().min(10),
+  category: z.string().optional().default('General'),
+  issueLocation: z.string().optional().default('Assigned Unit'),
+  accessTime: z.string().optional().default('Anytime during business hours'),
+  description: z.string().min(1, 'Please describe the problem'),
+  urgency: z.string().optional().default('Normal'),
+  priority: z.string().optional(),
   photoUrls: z.array(z.string()).optional(),
 });
 

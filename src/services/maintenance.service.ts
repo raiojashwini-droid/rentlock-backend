@@ -13,6 +13,8 @@ export class MaintenanceService {
     }
 
     if (query.propertyId) where.propertyId = parseInt(query.propertyId, 10);
+    if (query.tenantId) where.tenantId = parseInt(query.tenantId, 10);
+    if (query.unitId) where.unitId = parseInt(query.unitId, 10);
     if (query.status) where.status = query.status;
     if (query.priority) where.priority = query.priority;
 
