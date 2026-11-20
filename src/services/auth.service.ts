@@ -15,6 +15,10 @@ export class AuthService {
     if (email) AuthService.deactivatedEmails.delete(email.trim().toLowerCase());
   }
 
+  static isUserDeactivated(email: string): boolean {
+    return email ? AuthService.deactivatedEmails.has(email.trim().toLowerCase()) : false;
+  }
+
   static async login(email: string, password: string, requestedRole?: string) {
     const cleanEmail = email.trim().toLowerCase();
     if (AuthService.deactivatedEmails.has(cleanEmail)) {

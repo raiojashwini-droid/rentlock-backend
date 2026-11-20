@@ -125,6 +125,7 @@ export class UserController {
       });
 
       const enriched = managers.map((m) => {
+        const isDeactivated = AuthService.isUserDeactivated(m.email);
         const propNames = (m.managedProperties || []).map((p) => p.name);
         return {
           id: m.id,
@@ -140,11 +141,11 @@ export class UserController {
           permissions: m.permissions,
           employmentType: 'Full-Time',
           shift: 'Day (8 AM–5 PM)',
-          status: 'Active',
+          status: isDeactivated ? 'Deactivated' : 'Active',
           activeWorkOrders: 0,
           attendance: 100,
           rating: 5.0,
-          archived: false,
+          archived: isDeactivated,
           createdAt: m.createdAt,
         };
       });
@@ -278,7 +279,7 @@ export class UserController {
         await UserController.syncManagerProperties(user.id, propList);
       }
 
-      if (req.body.archived === true || req.body.status === 'Archived') {
+      if (req.body.archived === true || req.body.status === 'Archived' || req.body.status === 'Deactivated') {
         const targetEmail = cleanEmail || user?.email;
         if (targetEmail) AuthService.deactivateUser(targetEmail);
       } else if (req.body.archived === false || req.body.status === 'Active') {
@@ -287,6 +288,48 @@ export class UserController {
       }
 
       return sendSuccess(res, user, 'Manager updated successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteManager(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rawId = req.params.id;
+      const numericId = parseInt(rawId, 10);
+      const queryEmail = req.query.email ? String(req.query.email).toLowerCase().trim() : undefined;
+
+      let targetUser = null;
+      if (!isNaN(numericId) && numericId > 0) {
+        targetUser = await prisma.user.findUnique({ where: { id: numericId } });
+      }
+      if (!targetUser && queryEmail) {
+        targetUser = await prisma.user.findUnique({ where: { email: queryEmail } });
+      }
+
+      const userId = targetUser?.id || (!isNaN(numericId) && numericId > 0 ? numericId : null);
+
+      if (userId) {
+        // Safe dissociation: unassign properties managed by this manager rather than deleting them
+        await prisma.property.updateMany({
+          where: { managerId: userId },
+          data: { managerId: null },
+        }).catch(() => {});
+
+        await prisma.userPermission.deleteMany({ where: { userId } }).catch(() => {});
+        await prisma.broadcast.deleteMany({ where: { sentByUserId: userId } }).catch(() => {});
+
+        if (targetUser) {
+          await prisma.user.delete({ where: { id: userId } }).catch(() => {});
+        }
+      }
+
+      const emailToClear = targetUser?.email || queryEmail;
+      if (emailToClear) {
+        AuthService.activateUser(emailToClear);
+      }
+
+      return sendSuccess(res, { id: userId }, 'Manager deleted successfully');
     } catch (error) {
       return next(error);
     }

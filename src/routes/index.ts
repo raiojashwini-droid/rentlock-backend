@@ -43,5 +43,6 @@ router.delete('/owners/:id', authenticateToken, UserController.deleteOwner);
 router.get('/managers', authenticateToken, UserController.listManagers);
 router.post('/managers', authenticateToken, UserController.createManager);
 router.put('/managers/:id', authenticateToken, UserController.updateManager);
+router.delete('/managers/:id', authenticateToken, UserController.deleteManager);
 
 export default router;
