@@ -7,6 +7,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   refreshTokenSchema,
+  changePasswordSchema,
 } from '../validators/auth.validator.js';
 
 const router = Router();
@@ -17,5 +18,11 @@ router.post('/logout', authenticateToken, AuthController.logout);
 router.post('/refresh-token', validateBody(refreshTokenSchema), AuthController.refreshToken);
 router.post('/forgot-password', validateBody(forgotPasswordSchema), AuthController.forgotPassword);
 router.post('/reset-password', validateBody(resetPasswordSchema), AuthController.resetPassword);
+router.post(
+  '/change-password',
+  authenticateToken,
+  validateBody(changePasswordSchema),
+  AuthController.changePassword
+);
 
 export default router;
