@@ -310,6 +310,19 @@ export class PortalService {
     const desc = (data.description || '').trim();
     const shortTitle = desc.split(/[.!?\n]/)[0].slice(0, 45) || 'Maintenance Request';
 
+    if (desc) {
+      const existing = await prisma.maintenanceTicket.findFirst({
+        where: {
+          description: desc,
+          status: { in: ['Open', 'In_Progress', 'Pending_Approval'] },
+        },
+        include: { property: true, unit: true, tenant: true },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
     return prisma.maintenanceTicket.create({
       data: {
         ticketNumber,
