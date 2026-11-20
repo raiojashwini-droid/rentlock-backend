@@ -240,19 +240,54 @@ export class PortalService {
       };
     }
 
-    const invoice = await prisma.invoice.findUnique({ where: { id: data.invoiceId } });
-    if (!invoice) throw new Error('Invoice not found');
+    let invoice = null;
+    if (data.invoiceId) {
+      invoice = await prisma.invoice.findUnique({ where: { id: data.invoiceId } });
+    }
+
+    if (!invoice) {
+      invoice = await prisma.invoice.findFirst({
+        where: {
+          tenantId: tenant.id,
+          status: { in: ['Pending', 'Overdue'] },
+        },
+        orderBy: { dueDate: 'asc' },
+      });
+    }
+
+    if (!invoice) {
+      const unitId = tenant.unitId || tenant.leases?.[0]?.unitId || (await prisma.unit.findFirst())?.id || 1;
+      const rentAmt = Math.max(data.amount, Number(tenant.unit?.rentAmount || 1500));
+      const yearMonth = new Date().toISOString().slice(0, 7).replace('-', '');
+      const invoiceNumber = `INV-${yearMonth}-${Math.floor(1000 + Math.random() * 9000)}`;
+      invoice = await prisma.invoice.create({
+        data: {
+          invoiceNumber,
+          tenantId: tenant.id,
+          unitId,
+          description: `Base Rent - ${tenant.name}`,
+          amount: rentAmt,
+          paidAmount: 0,
+          balance: rentAmt,
+          status: 'Pending',
+          dueDate: new Date(),
+        },
+      });
+    }
 
     const payAmt = Math.min(Number(invoice.balance), data.amount);
     const newPaid = Number(invoice.paidAmount) + payAmt;
     const newBal = Math.max(0, Number(invoice.amount) - newPaid);
     const newStatus = newBal === 0 ? 'Paid' : 'Pending';
 
-    const receiptNumber = `RCT-${Math.floor(8000 + Math.random() * 1000)}`;
+    const isCash = (data.paymentMethod || '').toLowerCase().includes('cash');
+    const receiptNumber = isCash
+      ? `CSH-${Math.floor(8000 + Math.random() * 1000)}`
+      : `RCT-${Math.floor(8000 + Math.random() * 1000)}`;
 
     const [updatedInvoice, receipt] = await prisma.$transaction([
       prisma.invoice.update({
-        where: { id: data.invoiceId },
+        where: { id: invoice.id },
         data: {
           paidAmount: newPaid,
           balance: newBal,
@@ -264,7 +299,7 @@ export class PortalService {
       prisma.receipt.create({
         data: {
           receiptNumber,
-          invoiceId: data.invoiceId,
+          invoiceId: invoice.id,
           amount: payAmt,
           method: data.paymentMethod,
           status: 'Posted',
@@ -273,7 +308,7 @@ export class PortalService {
       }),
     ]);
 
-    return { invoice: updatedInvoice, receipt };
+    return { invoice: updatedInvoice, receipt, message: 'Payment submitted successfully' };
   }
 
   static async submitTenantWorkOrder(data: any, user: any) {
@@ -408,9 +443,33 @@ export class PortalService {
   }
 
   static async updatePropertyAccessNotes(propertyId: number, accessNotes: string) {
+    const current = await prisma.property.findUnique({ where: { id: propertyId } });
+    if (!current) throw new Error('Property not found');
+
+    // Extract and preserve all critical metadata tags
+    const existing = current.accessNotes || '';
+    const preservedTags: string[] = [];
+    const codeTag = existing.match(/\[CODE:.*?\]/)?.[0];
+    const categoryTag = existing.match(/\[CATEGORY:.*?\]/)?.[0];
+    const portfolioTag = existing.match(/\[PORTFOLIO:.*?\]/)?.[0];
+    const mgrTag = existing.match(/\[MGR:.*?\]/)?.[0];
+    const ownerTag = existing.match(/\[OWNER:.*?\]/)?.[0];
+
+    if (codeTag) preservedTags.push(codeTag);
+    if (categoryTag) preservedTags.push(categoryTag);
+    if (portfolioTag) preservedTags.push(portfolioTag);
+    if (mgrTag) preservedTags.push(mgrTag);
+    if (ownerTag) preservedTags.push(ownerTag);
+
+    // Clean incoming notes of duplicate tags
+    const cleanNotes = (accessNotes || '').replace(/\[(CODE|CATEGORY|PORTFOLIO|MGR|OWNER):.*?\]/g, '').trim();
+    const finalNotes = preservedTags.length > 0
+      ? `${cleanNotes} ${preservedTags.join(' ')}`.trim()
+      : cleanNotes;
+
     return prisma.property.update({
       where: { id: propertyId },
-      data: { accessNotes },
+      data: { accessNotes: finalNotes },
     });
   }
 

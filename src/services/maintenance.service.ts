@@ -38,17 +38,7 @@ export class MaintenanceService {
       }),
     ]);
 
-    // Deduplicate any repeated tickets with identical description or title
-    const seenDesc = new Set<string>();
-    const uniqueItems = items.filter((t) => {
-      const desc = ((t.description || t.title || '').trim()).toLowerCase();
-      if (!desc) return true;
-      if (seenDesc.has(desc)) return false;
-      seenDesc.add(desc);
-      return true;
-    });
-
-    const enriched = uniqueItems.map((t) => {
+    const enriched = items.map((t) => {
       let mappedStatus = 'New';
       if (t.status === 'Open') mappedStatus = 'New';
       else if (t.status === 'Pending_Approval') mappedStatus = 'Reviewed & Prioritized';

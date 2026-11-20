@@ -74,23 +74,6 @@ export async function authenticateToken(
 
     return next();
   } catch (error) {
-    if (token.startsWith('custom-jwt-token-') || token.startsWith('mock-jwt-token-')) {
-      const isOwner = token.includes('owner');
-      const isManager = token.includes('manager');
-      const role = isOwner ? 'owner' : (isManager ? 'manager' : 'admin');
-      const defaultRolePerms = DEFAULT_ROLE_PERMISSIONS[role] || DEFAULT_ROLE_PERMISSIONS.admin;
-      req.user = {
-        id: role === 'admin' ? 1 : 999,
-        email: `${role}@rentlock.com`,
-        name: role === 'admin' ? 'Robert King' : 'Demo User',
-        role,
-      };
-      req.permissions = {
-        ...defaultRolePerms,
-        isCustomOverride: false,
-      };
-      return next();
-    }
     return sendError(res, 'Invalid or expired access token', 401, 'INVALID_TOKEN', error);
   }
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const tenantPaymentSchema = z.object({
-  invoiceId: z.number().int(),
+  invoiceId: z.number().int().optional().nullable(),
   amount: z.number().positive(),
   paymentMethod: z.string().min(2),
   isAutopayEnabled: z.boolean().default(false),

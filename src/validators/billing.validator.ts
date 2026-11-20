@@ -10,7 +10,7 @@ export const createInvoiceSchema = z.object({
 
 export const payInvoiceSchema = z.object({
   amountPaid: z.number().positive('Payment amount must be positive'),
-  paymentMethod: z.enum(['Stripe Card', 'ACH Direct', 'Manual Check', 'Cash Drawer']),
+  paymentMethod: z.string().min(2, 'Payment method required'),
   referenceNotes: z.string().optional(),
   idempotencyKey: z.string().optional(),
 });
