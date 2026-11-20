@@ -7,7 +7,7 @@ export class PortalController {
   static async getOwnerOverview(req: Request, res: Response, next: NextFunction) {
     try {
       const ownerId = req.user?.id || 2;
-      const data = await PortalService.getOwnerOverview(ownerId);
+      const data = await PortalService.getOwnerOverview(ownerId, req.user);
       return sendSuccess(res, data);
     } catch (error) {
       return next(error);

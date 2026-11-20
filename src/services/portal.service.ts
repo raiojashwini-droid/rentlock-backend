@@ -1,10 +1,33 @@
 import { prisma } from '../config/database.js';
+import { AuthUserPayload } from '../types/index.js';
 
 export class PortalService {
   // -------------------- OWNER PORTAL --------------------
-  static async getOwnerOverview(ownerId: number) {
+  static async getOwnerOverview(ownerId: number, user?: AuthUserPayload) {
+    let ownerUser = null;
+    if (ownerId) {
+      ownerUser = await prisma.user.findUnique({ where: { id: ownerId } }).catch(() => null);
+    }
+    const resolvedName = user?.name || ownerUser?.name || '';
+    const resolvedEmail = user?.email || ownerUser?.email || '';
+
+    const ownerConditions: any[] = [];
+    if (ownerId) {
+      ownerConditions.push({ ownerId });
+    }
+    if (resolvedName) {
+      ownerConditions.push({ accessNotes: { contains: `[OWNER:${resolvedName}]` } });
+      ownerConditions.push({ accessNotes: { contains: `[OWNER:${resolvedName} ` } });
+      ownerConditions.push({ owner: { name: resolvedName } });
+    }
+    if (resolvedEmail) {
+      ownerConditions.push({ owner: { email: resolvedEmail.toLowerCase() } });
+    }
+
     let properties = await prisma.property.findMany({
-      where: { ownerId },
+      where: {
+        OR: ownerConditions.length > 0 ? ownerConditions : [{ ownerId }],
+      },
       include: {
         units: true,
         expenses: true,
@@ -23,19 +46,20 @@ export class PortalService {
         s +
         p.units
           .filter((u) => u.status === 'Occupied')
-          .reduce((sum, u) => sum + Number(u.rentAmount), 0),
+          .reduce((sum, u) => sum + Number(u.rentAmount || 0), 0),
       0
     );
 
     const totalExpenses = properties.reduce(
-      (s, p) => s + p.expenses.reduce((sum, e) => sum + Number(e.amount), 0),
+      (s, p) => s + p.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0),
       0
     );
 
     const netOperatingIncome = totalRevenue - totalExpenses;
+    const portfolioName = resolvedName ? `${resolvedName} Holdings` : 'Portfolio Holdings';
 
     return {
-      portfolioName: 'Claire Bennett Holdings',
+      portfolioName,
       totalProperties: properties.length,
       totalUnits,
       occupiedUnits,
@@ -44,12 +68,21 @@ export class PortalService {
       monthlyOperatingExpenses: totalExpenses,
       netOperatingIncome,
       cashHeldInReserve: 0.0,
-      properties: properties.map((p) => ({
-        id: p.id,
-        name: p.name,
-        address: p.address,
-        unitsCount: p.units.length,
-      })),
+      properties: properties.map((p) => {
+        const unitsCount = p.units.length;
+        const occ = p.units.filter((u) => u.status === 'Occupied').length;
+        const rev = p.units.filter((u) => u.status === 'Occupied').reduce((sum, u) => sum + Number(u.rentAmount || 0), 0);
+        return {
+          id: p.id,
+          name: p.name,
+          address: p.address,
+          unitsCount,
+          totalUnits: unitsCount,
+          occupiedUnits: occ,
+          monthlyRevenue: rev,
+          rent: rev,
+        };
+      }),
     };
   }
 

@@ -1,28 +1,50 @@
 import { prisma } from '../config/database.js';
 import { AuthUserPayload } from '../types/index.js';
+import { hashPassword } from '../utils/password.js';
 
 export class PropertyService {
   static async listProperties(query: any, user?: AuthUserPayload) {
-    const where: any = {};
+    const andClauses: any[] = [];
 
-    // Persona-based data boundary
+    // Persona-based data boundary: Ensure each owner strictly sees only their own properties
     if (user?.role === 'manager') {
-      where.managerId = user.id;
+      const mgrConditions: any[] = [{ managerId: user.id }];
+      if (user.name) {
+        mgrConditions.push({ accessNotes: { contains: `[MGR:${user.name}]` } });
+        mgrConditions.push({ manager: { name: user.name } });
+      }
+      if (user.email) {
+        mgrConditions.push({ manager: { email: user.email.toLowerCase() } });
+      }
+      andClauses.push({ OR: mgrConditions });
     } else if (user?.role === 'owner') {
-      where.ownerId = user.id;
+      const ownerConditions: any[] = [{ ownerId: user.id }];
+      if (user.name) {
+        ownerConditions.push({ accessNotes: { contains: `[OWNER:${user.name}]` } });
+        ownerConditions.push({ accessNotes: { contains: `[OWNER:${user.name} ` } });
+        ownerConditions.push({ owner: { name: user.name } });
+      }
+      if (user.email) {
+        ownerConditions.push({ owner: { email: user.email.toLowerCase() } });
+      }
+      andClauses.push({ OR: ownerConditions });
     }
 
     if (query.city) {
-      where.city = { contains: String(query.city) };
+      andClauses.push({ city: { contains: String(query.city) } });
     }
 
     if (query.search) {
-      where.OR = [
-        { name: { contains: String(query.search) } },
-        { address: { contains: String(query.search) } },
-        { city: { contains: String(query.search) } },
-      ];
+      andClauses.push({
+        OR: [
+          { name: { contains: String(query.search) } },
+          { address: { contains: String(query.search) } },
+          { city: { contains: String(query.search) } },
+        ],
+      });
     }
+
+    const where = andClauses.length > 0 ? { AND: andClauses } : {};
 
     const page = Math.max(1, parseInt(query.page || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(query.limit || '20', 10)));
@@ -149,28 +171,58 @@ export class PropertyService {
       if (mgr) resolvedManagerId = mgr.id;
     }
 
-    let resolvedOwnerId = data.ownerId && !isNaN(Number(data.ownerId)) && Number(data.ownerId) < 1000000000000 ? Number(data.ownerId) : undefined;
-    if (!resolvedOwnerId && data.owner) {
-      const ownName = String(data.owner).trim();
-      const ownerUser = await prisma.user.findFirst({
+    let resolvedOwnerId: number | undefined = undefined;
+    if (data.owner) {
+      const cleanOwnName = String(data.owner).replace(/\(.*?\)/g, '').trim();
+      let ownerUser = await prisma.user.findFirst({
         where: {
           role: 'owner',
           OR: [
-            { name: ownName },
-            { email: ownName.toLowerCase() },
+            { name: { equals: cleanOwnName } },
+            { email: { equals: cleanOwnName.toLowerCase() } },
+            { name: { contains: cleanOwnName } },
           ],
         },
         select: { id: true },
       });
+
+      // If owner user does not exist in DB yet, auto-create user account
+      if (!ownerUser && cleanOwnName && cleanOwnName.toLowerCase() !== 'unassigned') {
+        const cleanEmail = cleanOwnName.includes('@')
+          ? cleanOwnName.toLowerCase()
+          : `${cleanOwnName.toLowerCase().replace(/[^a-z0-9]/g, '')}@rentlock.com`;
+        const passwordHash = await hashPassword('demo123');
+        ownerUser = await prisma.user.upsert({
+          where: { email: cleanEmail },
+          update: { role: 'owner', name: cleanOwnName },
+          create: {
+            name: cleanOwnName,
+            email: cleanEmail,
+            role: 'owner',
+            passwordHash,
+          },
+          select: { id: true },
+        }).catch(() => null);
+      }
+
       if (ownerUser) resolvedOwnerId = ownerUser.id;
     }
 
+    if (!resolvedOwnerId && data.ownerId && !isNaN(Number(data.ownerId)) && Number(data.ownerId) < 1000000000000) {
+      const checkUser = await prisma.user.findFirst({
+        where: { id: Number(data.ownerId), role: 'owner' },
+        select: { id: true },
+      });
+      if (checkUser) resolvedOwnerId = checkUser.id;
+    }
+
+    const cleanOwnerTag = data.owner ? String(data.owner).replace(/\(.*?\)/g, '').trim() : '';
     const metaTags = [];
     if (data.code) metaTags.push(`[CODE:${data.code}]`);
     if (data.category) metaTags.push(`[CATEGORY:${data.category}]`);
     if (data.portfolioGroup) metaTags.push(`[PORTFOLIO:${data.portfolioGroup}]`);
     if (data.manager) metaTags.push(`[MGR:${data.manager}]`);
-    if (data.owner) metaTags.push(`[OWNER:${data.owner}]`);
+    if (cleanOwnerTag) metaTags.push(`[OWNER:${cleanOwnerTag}]`);
     const packedNotes = [data.accessNotes, ...metaTags].filter(Boolean).join(' ');
 
     const property = await prisma.property.create({
@@ -250,20 +302,48 @@ export class PropertyService {
       if (mgr) resolvedManagerId = mgr.id;
     }
 
-    let resolvedOwnerId = data.ownerId && !isNaN(Number(data.ownerId)) && Number(data.ownerId) < 1000000000000 ? Number(data.ownerId) : undefined;
-    if (!resolvedOwnerId && data.owner) {
-      const ownName = String(data.owner).trim();
-      const ownerUser = await prisma.user.findFirst({
+    let resolvedOwnerId: number | undefined = undefined;
+    if (data.owner) {
+      const cleanOwnName = String(data.owner).replace(/\(.*?\)/g, '').trim();
+      let ownerUser = await prisma.user.findFirst({
         where: {
           role: 'owner',
           OR: [
-            { name: ownName },
-            { email: ownName.toLowerCase() },
+            { name: { equals: cleanOwnName } },
+            { email: { equals: cleanOwnName.toLowerCase() } },
+            { name: { contains: cleanOwnName } },
           ],
         },
         select: { id: true },
       });
+
+      if (!ownerUser && cleanOwnName && cleanOwnName.toLowerCase() !== 'unassigned') {
+        const cleanEmail = cleanOwnName.includes('@')
+          ? cleanOwnName.toLowerCase()
+          : `${cleanOwnName.toLowerCase().replace(/[^a-z0-9]/g, '')}@rentlock.com`;
+        const passwordHash = await hashPassword('demo123');
+        ownerUser = await prisma.user.upsert({
+          where: { email: cleanEmail },
+          update: { role: 'owner', name: cleanOwnName },
+          create: {
+            name: cleanOwnName,
+            email: cleanEmail,
+            role: 'owner',
+            passwordHash,
+          },
+          select: { id: true },
+        }).catch(() => null);
+      }
+
       if (ownerUser) resolvedOwnerId = ownerUser.id;
+    }
+
+    if (!resolvedOwnerId && data.ownerId && !isNaN(Number(data.ownerId)) && Number(data.ownerId) < 1000000000000) {
+      const checkUser = await prisma.user.findFirst({
+        where: { id: Number(data.ownerId), role: 'owner' },
+        select: { id: true },
+      });
+      if (checkUser) resolvedOwnerId = checkUser.id;
     }
 
     const currentProp = await prisma.property.findUnique({ where: { id } });
@@ -272,7 +352,10 @@ export class PropertyService {
     if (data.category) existingNotes = existingNotes.replace(/\[CATEGORY:.*?\]/g, '') + ` [CATEGORY:${data.category}]`;
     if (data.portfolioGroup) existingNotes = existingNotes.replace(/\[PORTFOLIO:.*?\]/g, '') + ` [PORTFOLIO:${data.portfolioGroup}]`;
     if (data.manager) existingNotes = existingNotes.replace(/\[MGR:.*?\]/g, '') + ` [MGR:${data.manager}]`;
-    if (data.owner) existingNotes = existingNotes.replace(/\[OWNER:.*?\]/g, '') + ` [OWNER:${data.owner}]`;
+    if (data.owner) {
+      const cleanOwnerTag = String(data.owner).replace(/\(.*?\)/g, '').trim();
+      existingNotes = existingNotes.replace(/\[OWNER:.*?\]/g, '') + ` [OWNER:${cleanOwnerTag}]`;
+    }
 
     const cleanData: any = {};
     if (data.name !== undefined) cleanData.name = data.name;
