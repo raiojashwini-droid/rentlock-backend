@@ -56,4 +56,22 @@ export class AuthController {
       return next(error);
     }
   }
+
+  static async changePassword(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user?.id) return sendError(res, 'Unauthorized', 401);
+      const { currentPassword, newPassword } = req.body;
+      const result = await AuthService.changePassword(
+        req.user.id,
+        currentPassword,
+        newPassword,
+        req.user.email,
+        req.user.name,
+        req.user.role
+      );
+      return sendSuccess(res, result, 'Password has been successfully updated in database');
+    } catch (error: any) {
+      return sendError(res, error.message || 'Failed to update password', 400);
+    }
+  }
 }
