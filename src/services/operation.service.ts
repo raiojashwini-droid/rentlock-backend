@@ -236,10 +236,27 @@ export class OperationService {
       }
     }
 
+    const stallNumber = String(data.stallNumber || data.spotNumber || 'P-101').trim();
+    const existing = await prisma.parkingStall.findFirst({
+      where: { propertyId: resolvedPropertyId, stallNumber },
+    });
+
+    if (existing) {
+      return prisma.parkingStall.update({
+        where: { id: existing.id },
+        data: {
+          stallType: stallType as any,
+          monthlyFee: Number(data.monthlyFee) || 150,
+          status: (data.status === 'Assigned' || data.assignedResident || (data.unitNumber && data.unitNumber !== 'Unassigned')) ? 'Assigned' : 'Vacant',
+          assignedVehiclePlate: data.assignedVehiclePlate || data.licensePlate || null,
+        },
+      });
+    }
+
     return prisma.parkingStall.create({
       data: {
         propertyId: resolvedPropertyId,
-        stallNumber: String(data.stallNumber || data.spotNumber || 'P-101'),
+        stallNumber,
         stallType: stallType as any,
         monthlyFee: Number(data.monthlyFee) || 150,
         status: (data.status === 'Assigned' || data.assignedResident || (data.unitNumber && data.unitNumber !== 'Unassigned')) ? 'Assigned' : 'Vacant',

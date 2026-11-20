@@ -9,6 +9,11 @@ const router = Router();
 
 router.use(authenticateToken);
 
+// Portfolio Groups (Placed before /:id)
+router.get('/portfolios', PropertyController.listPortfolios);
+router.post('/portfolios', PropertyController.createPortfolio);
+router.delete('/portfolios/:name', PropertyController.deletePortfolio);
+
 router.get('/', requirePermission('canViewProperties'), PropertyController.list);
 router.get('/:id', requirePermission('canViewProperties'), PropertyController.getById);
 router.post('/', requirePermission('canAddProperties'), validateBody(createPropertySchema), PropertyController.create);
