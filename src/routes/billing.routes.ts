@@ -18,6 +18,7 @@ router.use(authenticateToken);
 
 // Invoices
 router.get('/', BillingController.listInvoices);
+router.get('/invoices', BillingController.listInvoices);
 router.get('/:id', BillingController.getInvoiceById);
 router.post('/', validateBody(createInvoiceSchema), BillingController.createInvoice);
 router.post('/:id/pay', validateBody(payInvoiceSchema), BillingController.payInvoice);
