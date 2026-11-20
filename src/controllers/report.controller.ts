@@ -5,7 +5,8 @@ import { sendSuccess } from '../utils/response.js';
 export class ReportController {
   static async getSummary(req: Request, res: Response, next: NextFunction) {
     try {
-      const summary = await ReportService.getSummary();
+      const propertyId = req.query.propertyId ? Number(req.query.propertyId) : undefined;
+      const summary = await ReportService.getSummary(propertyId);
       return sendSuccess(res, summary);
     } catch (error) {
       return next(error);
@@ -14,7 +15,8 @@ export class ReportController {
 
   static async getRevenueByMonth(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await ReportService.getRevenueByMonth();
+      const propertyId = req.query.propertyId ? Number(req.query.propertyId) : undefined;
+      const data = await ReportService.getRevenueByMonth(propertyId);
       return sendSuccess(res, data);
     } catch (error) {
       return next(error);
@@ -32,7 +34,8 @@ export class ReportController {
 
   static async getExpensesByCategory(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await ReportService.getExpensesByCategory();
+      const propertyId = req.query.propertyId ? Number(req.query.propertyId) : undefined;
+      const data = await ReportService.getExpensesByCategory(propertyId);
       return sendSuccess(res, data);
     } catch (error) {
       return next(error);

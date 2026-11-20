@@ -1,13 +1,21 @@
 import { prisma } from '../config/database.js';
 
 export class ReportService {
-  static async getSummary() {
+  static async getSummary(propertyId?: number) {
+    const unitWhere: any = propertyId ? { propertyId } : {};
+    const invoiceWhere: any = propertyId ? { unit: { propertyId } } : {};
+    const expenseWhere: any = propertyId ? { propertyId } : {};
+    const ticketWhere: any = {
+      status: { in: ['Open', 'In_Progress'] },
+      ...(propertyId ? { propertyId } : {}),
+    };
+
     const [properties, units, invoices, expenses, tickets] = await Promise.all([
-      prisma.property.count(),
-      prisma.unit.findMany({ select: { status: true, rentAmount: true } }),
-      prisma.invoice.findMany({ select: { amount: true, paidAmount: true, balance: true, status: true } }),
-      prisma.expense.findMany({ select: { amount: true } }),
-      prisma.maintenanceTicket.count({ where: { status: { in: ['Open', 'In_Progress'] } } }),
+      propertyId ? 1 : prisma.property.count(),
+      prisma.unit.findMany({ where: unitWhere, select: { status: true, rentAmount: true } }),
+      prisma.invoice.findMany({ where: invoiceWhere, select: { amount: true, paidAmount: true, balance: true, status: true } }),
+      prisma.expense.findMany({ where: expenseWhere, select: { amount: true } }),
+      prisma.maintenanceTicket.count({ where: ticketWhere }),
     ]);
 
     const totalUnits = units.length;
@@ -43,13 +51,17 @@ export class ReportService {
     };
   }
 
-  static async getRevenueByMonth() {
-    const units = await prisma.unit.findMany({ where: { status: 'Occupied' }, select: { rentAmount: true } });
+  static async getRevenueByMonth(propertyId?: number) {
+    const unitWhere: any = { status: 'Occupied', ...(propertyId ? { propertyId } : {}) };
+    const invoiceWhere: any = propertyId ? { unit: { propertyId } } : {};
+    const expenseWhere: any = propertyId ? { propertyId } : {};
+
+    const units = await prisma.unit.findMany({ where: unitWhere, select: { rentAmount: true } });
     const monthlyActiveRent = units.reduce((s, u) => s + Number(u.rentAmount || 0), 0);
 
     const [invoices, expenses] = await Promise.all([
-      prisma.invoice.findMany({ select: { amount: true, paidAmount: true, dueDate: true } }),
-      prisma.expense.findMany({ select: { amount: true, date: true } }),
+      prisma.invoice.findMany({ where: invoiceWhere, select: { amount: true, paidAmount: true, dueDate: true } }),
+      prisma.expense.findMany({ where: expenseWhere, select: { amount: true, date: true } }),
     ]);
 
     const months = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'];
@@ -90,8 +102,9 @@ export class ReportService {
     });
   }
 
-  static async getExpensesByCategory() {
+  static async getExpensesByCategory(propertyId?: number) {
     const expenses = await prisma.expense.findMany({
+      where: propertyId ? { propertyId } : {},
       select: { category: true, amount: true },
     });
 
