@@ -391,46 +391,49 @@ export class TenantService {
     const tenant = await prisma.tenant.findUnique({ where: { id } });
     if (!tenant) throw new Error('Tenant not found');
 
-    // Create Audit Log entry
-    await prisma.auditLog.create({
-      data: {
-        auditId: `AUD-${Date.now()}`,
-        userLabel: actorName,
-        action: 'Deleted Tenant Profile',
-        target: `${tenant.name} (${tenant.email})`,
-        reason: 'Tenant record removed via Tenant Management',
-      },
-    }).catch(() => {});
-
-    // If unit was assigned, free it if no other active tenants
-    if (tenant.unitId) {
-      const otherTenants = await prisma.tenant.count({
-        where: { unitId: tenant.unitId, id: { not: id }, status: 'Active' },
+    return prisma.$transaction(async (tx) => {
+      // Create Audit Log entry
+      await tx.auditLog.create({
+        data: {
+          auditId: `AUD-${Date.now()}`,
+          userLabel: actorName,
+          action: 'Deleted Tenant Profile',
+          target: `${tenant.name} (${tenant.email})`,
+          reason: 'Tenant record removed via Tenant Management',
+        },
       });
-      if (otherTenants === 0) {
-        await prisma.unit.update({
-          where: { id: tenant.unitId },
-          data: { status: 'Vacant' },
-        }).catch(() => {});
+
+      // If unit was assigned, free it if no other active tenants
+      if (tenant.unitId) {
+        const otherTenants = await tx.tenant.count({
+          where: { unitId: tenant.unitId, id: { not: id }, status: 'Active' },
+        });
+        if (otherTenants === 0) {
+          await tx.unit.update({
+            where: { id: tenant.unitId },
+            data: { status: 'Vacant' },
+          });
+        }
       }
-    }
 
-    // Clean up child records with foreign key constraints
-    await prisma.securityDeposit.deleteMany({ where: { tenantId: id } }).catch(() => {});
-    await prisma.ledgerAdjustment.deleteMany({ where: { tenantId: id } }).catch(() => {});
-    await prisma.visitorPass.deleteMany({ where: { hostTenantId: id } }).catch(() => {});
-    await prisma.parkingStall.updateMany({ where: { assignedTenantId: id }, data: { assignedTenantId: null, status: 'Vacant' } }).catch(() => {});
-    await prisma.invoice.deleteMany({ where: { tenantId: id } }).catch(() => {});
-    await prisma.lease.deleteMany({ where: { tenantId: id } }).catch(() => {});
-    await prisma.maintenanceTicket.deleteMany({ where: { tenantId: id } }).catch(() => {});
+      // Clean up child records with foreign key constraints atomically
+      await tx.receipt.deleteMany({ where: { invoice: { tenantId: id } } });
+      await tx.securityDeposit.deleteMany({ where: { tenantId: id } });
+      await tx.ledgerAdjustment.deleteMany({ where: { tenantId: id } });
+      await tx.visitorPass.deleteMany({ where: { hostTenantId: id } });
+      await tx.parkingStall.updateMany({ where: { assignedTenantId: id }, data: { assignedTenantId: null, status: 'Vacant' } });
+      await tx.invoice.deleteMany({ where: { tenantId: id } });
+      await tx.lease.deleteMany({ where: { tenantId: id } });
+      await tx.maintenanceTicket.deleteMany({ where: { tenantId: id } });
 
-    const deleted = await prisma.tenant.delete({ where: { id } });
+      const deleted = await tx.tenant.delete({ where: { id } });
 
-    // Clean up login user account if exists
-    if (tenant.userId) {
-      await prisma.user.delete({ where: { id: tenant.userId } }).catch(() => {});
-    }
+      // Clean up login user account if exists
+      if (tenant.userId) {
+        await tx.user.delete({ where: { id: tenant.userId } }).catch(() => {});
+      }
 
-    return deleted;
+      return deleted;
+    });
   }
 }

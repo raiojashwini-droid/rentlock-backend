@@ -378,25 +378,44 @@ export class PropertyService {
   }
 
   static async deleteProperty(id: number) {
-    // Clean up any child records with foreign keys
+    const property = await prisma.property.findUnique({ where: { id } });
+    if (!property) throw new Error('Property not found');
+
     const units = await prisma.unit.findMany({
       where: { propertyId: id },
       select: { id: true },
     });
     const unitIds = units.map((u) => u.id);
 
-    if (unitIds.length > 0) {
-      await prisma.invoice.deleteMany({ where: { unitId: { in: unitIds } } });
-      await prisma.maintenanceTicket.deleteMany({ where: { unitId: { in: unitIds } } });
-      await prisma.lease.deleteMany({ where: { unitId: { in: unitIds } } });
-      await prisma.unit.deleteMany({ where: { id: { in: unitIds } } });
-    }
-    await prisma.maintenanceTicket.deleteMany({ where: { propertyId: id } });
-    await prisma.lease.deleteMany({ where: { propertyId: id } });
-    await prisma.tenant.deleteMany({ where: { propertyId: id } });
-    await prisma.propertyDocument.deleteMany({ where: { propertyId: id } });
+    return prisma.$transaction(async (tx) => {
+      // 1. Delete unit children
+      if (unitIds.length > 0) {
+        await tx.receipt.deleteMany({ where: { invoice: { unitId: { in: unitIds } } } });
+        await tx.invoice.deleteMany({ where: { unitId: { in: unitIds } } });
+        await tx.maintenanceTicket.deleteMany({ where: { unitId: { in: unitIds } } });
+        await tx.lease.deleteMany({ where: { unitId: { in: unitIds } } });
+        await tx.unit.deleteMany({ where: { id: { in: unitIds } } });
+      }
 
-    return prisma.property.delete({ where: { id } });
+      // 2. Delete property children
+      await tx.receipt.deleteMany({ where: { invoice: { tenant: { propertyId: id } } } });
+      await tx.invoice.deleteMany({ where: { tenant: { propertyId: id } } });
+      await tx.securityDeposit.deleteMany({ where: { propertyId: id } });
+      await tx.ledgerAdjustment.deleteMany({ where: { propertyId: id } });
+      await tx.maintenanceTicket.deleteMany({ where: { propertyId: id } });
+      await tx.preventiveSchedule.deleteMany({ where: { propertyId: id } });
+      await tx.lease.deleteMany({ where: { propertyId: id } });
+      await tx.visitorPass.deleteMany({ where: { propertyId: id } });
+      await tx.parkingStall.deleteMany({ where: { propertyId: id } });
+      await tx.expense.deleteMany({ where: { propertyId: id } });
+      await tx.staff.deleteMany({ where: { propertyId: id } });
+      await tx.broadcast.deleteMany({ where: { propertyId: id } });
+      await tx.tenant.deleteMany({ where: { propertyId: id } });
+      await tx.propertyDocument.deleteMany({ where: { propertyId: id } });
+
+      // 3. Delete property record
+      return tx.property.delete({ where: { id } });
+    });
   }
 
   static async uploadDocument(propertyId: number, docData: { name: string; category: string; fileUrl: string; uploadedBy: string }) {
