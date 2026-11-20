@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const createVendorSchema = z.object({
-  name: z.str ng().min(2, 'Vendor name is required'),
+  name: z.string().min(2, 'Vendor name is required'),
   category: z.string().min(2, 'Category is required'),
   phone: z.string().optional().default('+1 (555) 000-0000'),
   email: z.string().optional(),
