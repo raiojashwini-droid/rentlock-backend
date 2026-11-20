@@ -189,7 +189,7 @@ export class OperationController {
 
   static async checkoutVisitor(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = req.params.id;
       const pass = await OperationService.checkoutVisitor(id);
       return sendSuccess(res, pass, 'Visitor marked checked out');
     } catch (error) {

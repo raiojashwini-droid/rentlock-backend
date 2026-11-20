@@ -46,14 +46,21 @@ export const assignParkingStallSchema = z.object({
 }).passthrough();
 
 export const createVisitorPassSchema = z.object({
-  propertyId: z.number().int(),
-  hostTenantId: z.number().int(),
-  unitNumber: z.string().min(1),
-  guestName: z.string().min(2, 'Guest name is required'),
-  guestPhone: z.string().optional(),
-  guestPlate: z.string().optional(),
-  entryMethod: z.string().default('Front Desk / Intercom'),
-  expiresAt: z.string(),
+  propertyId: z.coerce.number().int().optional(),
+  hostTenantId: z.coerce.number().int().optional(),
+  unitNumber: z.string().optional().default('T2'),
+  guestName: z.string().min(1, 'Guest name is required'),
+  guestPhone: z.string().optional().nullable(),
+  phone: z.string().optional().nullable(),
+  guestPlate: z.string().optional().nullable(),
+  vehiclePlate: z.string().optional().nullable(),
+  entryMethod: z.string().optional().default('Front Desk / Intercom'),
+  expiresAt: z.string().optional().nullable(),
+  expectedDate: z.string().optional().nullable(),
+  hostResident: z.string().optional().nullable(),
+  propertyName: z.string().optional().nullable(),
+  parkingStall: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 export const createStaffSchema = z.object({
