@@ -56,7 +56,7 @@ export class SettingsController {
     }
   }
 
-  static async getCompanySettings(req: Request, res: Response, next: NextFunction) {
+  static async getCompanySettings(_req: Request, res: Response, next: NextFunction) {
     try {
       const data = await SettingsService.getCompanySettings();
       return sendSuccess(res, data);

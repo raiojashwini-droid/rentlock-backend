@@ -90,6 +90,7 @@ export class PropertyService {
         zipCode: p.zipCode,
         yearBuilt: p.yearBuilt,
         imageUrl: p.imageUrl,
+        image: p.imageUrl || null,
         amenities: p.amenities,
         totalUnits,
         occupiedUnits,
