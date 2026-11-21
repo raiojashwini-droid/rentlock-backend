@@ -59,22 +59,9 @@ export class AuthService {
       });
     }
 
-    const isDemoPass = ['demo123', '123456', 'password', 'admin123'].includes(password);
     const isMatch = await comparePassword(password, user.passwordHash);
-    if (!isMatch && !isDemoPass) {
+    if (!isMatch) {
       throw new Error('Invalid email or password');
-    }
-
-    if (!isMatch && isDemoPass) {
-      try {
-        const newHash = await hashPassword(password);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { passwordHash: newHash },
-        });
-      } catch {
-        // ignore
-      }
     }
 
     const authPayload: AuthUserPayload = {
@@ -239,9 +226,7 @@ export class AuthService {
     }
 
     const isMatch = await comparePassword(currentPassword, user.passwordHash);
-    const isDemoPass = ['demo123', '123456', 'password', 'admin123'].includes(currentPassword);
-
-    if (!isMatch && !isDemoPass) {
+    if (!isMatch) {
       throw new Error('Current password is incorrect');
     }
 

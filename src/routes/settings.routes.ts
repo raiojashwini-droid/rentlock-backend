@@ -20,5 +20,6 @@ router.get('/rbac/:email', SettingsController.getUserRbac);
 router.put('/rbac/user/:email', validateBody(updateRbacSchema), SettingsController.updateUserRbac);
 router.post('/rbac/user/:email/reset', validateBody(resetRbacSchema), SettingsController.resetUserRbac);
 router.get('/audit-logs', SettingsController.listAuditLogs);
+router.post('/purge-data', SettingsController.purgeAllData);
 
 export default router;

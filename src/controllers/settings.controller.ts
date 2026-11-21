@@ -46,19 +46,11 @@ export class SettingsController {
     }
   }
 
-  static async getCompanySettings(req: Request, res: Response, next: NextFunction) {
+  static async purgeAllData(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await SettingsService.getCompanySettings();
-      return sendSuccess(res, data);
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  static async updateCompanySettings(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await SettingsService.updateCompanySettings(req.body, req.user);
-      return sendSuccess(res, data, 'Company defaults updated successfully');
+      if (!req.user || req.user.role !== 'admin') throw new Error('Unauthorized: Admin access required');
+      const result = await SettingsService.purgeAllData();
+      return sendSuccess(res, result, 'All operational data and non-admin accounts purged successfully');
     } catch (error) {
       return next(error);
     }
