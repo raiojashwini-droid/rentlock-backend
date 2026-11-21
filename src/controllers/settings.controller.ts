@@ -45,4 +45,22 @@ export class SettingsController {
       return next(error);
     }
   }
+
+  static async getCompanySettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await SettingsService.getCompanySettings();
+      return sendSuccess(res, data);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateCompanySettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await SettingsService.updateCompanySettings(req.body, req.user);
+      return sendSuccess(res, data, 'Company defaults updated successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
 }
