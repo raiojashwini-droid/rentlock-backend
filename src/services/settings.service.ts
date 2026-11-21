@@ -175,4 +175,67 @@ export class SettingsService {
       message: 'All operational data and non-admin accounts successfully purged. Only Admin retained.',
     };
   }
+
+  // -------------------- COMPANY DEFAULTS & LOCALE --------------------
+  private static cachedCompanySettings: any = {
+    companyName: 'RentLock Property Holdings LLC',
+    ein: '84-2910482',
+    supportEmail: 'operations@rentlock.com',
+    supportPhone: '+1 (718) 555-0100',
+    address: '450 Lexington Ave, Suite 1800, New York, NY 10017',
+    currency: 'USD ($)',
+    dateFormat: 'MM/DD/YYYY',
+    fiscalYearStart: 'January 1',
+    timezone: 'America/New_York (EST)',
+    accountingBasis: 'Accrual Basis (GAAP)',
+    lateFeeGracePeriodDays: 5,
+    standardSecurityDepositMonths: 1,
+  };
+
+  static async getCompanySettings() {
+    try {
+      const latest = await prisma.auditLog.findFirst({
+        where: { action: 'COMPANY_SETTINGS_SNAPSHOT' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (latest && latest.reason) {
+        try {
+          const parsed = JSON.parse(latest.reason);
+          SettingsService.cachedCompanySettings = {
+            ...SettingsService.cachedCompanySettings,
+            ...parsed,
+          };
+        } catch {}
+      }
+    } catch (err: any) {
+      console.warn('[SettingsService] Read company settings notice:', err?.message);
+    }
+    return SettingsService.cachedCompanySettings;
+  }
+
+  static async updateCompanySettings(data: any, adminUser?: any) {
+    const merged = {
+      ...SettingsService.cachedCompanySettings,
+      ...data,
+    };
+    SettingsService.cachedCompanySettings = merged;
+
+    try {
+      await prisma.auditLog.create({
+        data: {
+          auditId: `AUD-${Date.now()}`,
+          userId: adminUser?.id,
+          userLabel: adminUser?.name ? `${adminUser.name} (${adminUser.role || 'Admin'})` : 'Robert King (Admin)',
+          action: 'COMPANY_SETTINGS_SNAPSHOT',
+          target: merged.companyName || 'RentLock Property Holdings LLC',
+          beforeAfter: merged.ein || '84-2910482',
+          reason: JSON.stringify(merged),
+        },
+      });
+    } catch (err: any) {
+      console.warn('[SettingsService] Write company settings notice:', err?.message);
+    }
+
+    return merged;
+  }
 }
