@@ -34,8 +34,8 @@ async function main() {
   await prisma.userPermission.deleteMany();
   await prisma.user.deleteMany();
 
-  // 3. Seed Only Core Login Personas (Empty data state)
-  console.log('👤 Seeding core login user personas...');
+  // 3. Seed ONLY Admin persona (Empty data state)
+  console.log('👤 Seeding Admin user...');
   await prisma.user.create({
     data: {
       name: 'Robert King',
@@ -43,48 +43,6 @@ async function main() {
       passwordHash: defaultPasswordHash,
       role: 'admin',
       phone: '+1 (718) 555-0141',
-    },
-  });
-
-  await prisma.user.create({
-    data: {
-      name: 'Claire Bennett',
-      email: 'owner@rentlock.com',
-      passwordHash: defaultPasswordHash,
-      role: 'owner',
-      phone: '+1 (212) 555-0188',
-    },
-  });
-
-  const manager = await prisma.user.create({
-    data: {
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@rentlock.com',
-      passwordHash: defaultPasswordHash,
-      role: 'manager',
-      phone: '+1 (718) 555-0192',
-      permissions: {
-        create: {
-          canViewTenants: true,
-          canAddTenants: true,
-          canEditTenants: true,
-          canDeleteTenants: false,
-          canViewProperties: true,
-          canAddProperties: false,
-          canEditProperties: true,
-          canDeleteProperties: false,
-        },
-      },
-    },
-  });
-
-  await prisma.user.create({
-    data: {
-      name: 'Rebecca Miller',
-      email: 'rebecca@rentlock.com',
-      passwordHash: defaultPasswordHash,
-      role: 'tenant',
-      phone: '+1 (347) 555-0118',
     },
   });
 

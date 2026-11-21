@@ -45,4 +45,14 @@ export class SettingsController {
       return next(error);
     }
   }
+
+  static async purgeAllData(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.user || req.user.role !== 'admin') throw new Error('Unauthorized: Admin access required');
+      const result = await SettingsService.purgeAllData();
+      return sendSuccess(res, result, 'All operational data and non-admin accounts purged successfully');
+    } catch (error) {
+      return next(error);
+    }
+  }
 }

@@ -138,4 +138,41 @@ export class SettingsService {
 
     return { items, total, page, limit };
   }
+
+  static async purgeAllData() {
+    await prisma.auditLog.deleteMany();
+    await prisma.message.deleteMany();
+    await prisma.messageThread.deleteMany();
+    await prisma.receipt.deleteMany();
+    await prisma.invoice.deleteMany();
+    await prisma.ledgerAdjustment.deleteMany();
+    await prisma.securityDeposit.deleteMany();
+    await prisma.maintenanceTicket.deleteMany();
+    await prisma.preventiveSchedule.deleteMany();
+    await prisma.propertyDocument.deleteMany();
+    await prisma.visitorPass.deleteMany();
+    await prisma.parkingStall.deleteMany();
+    await prisma.broadcast.deleteMany();
+    await prisma.staff.deleteMany();
+    await prisma.expense.deleteMany();
+    await prisma.vendor.deleteMany();
+    await prisma.lease.deleteMany();
+    await prisma.tenant.deleteMany();
+    await prisma.unit.deleteMany();
+    await prisma.property.deleteMany();
+    await prisma.userPermission.deleteMany();
+
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          not: 'admin@rentlock.com',
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: 'All operational data and non-admin accounts successfully purged. Only Admin retained.',
+    };
+  }
 }
