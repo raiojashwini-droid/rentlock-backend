@@ -8,7 +8,7 @@ export const createPropertySchema = z.object({
   state: z.string().optional().default('NY'),
   zipCode: z.string().optional().default('11215'),
   yearBuilt: z.number().int().min(1800).max(2030).optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().optional(),
   amenities: z.array(z.string()).optional(),
   managerId: z.number().int().optional(),
   ownerId: z.number().int().optional(),
