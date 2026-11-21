@@ -3,6 +3,33 @@ import { DEFAULT_ROLE_PERMISSIONS } from '../config/constants.js';
 import { AuthUserPayload } from '../types/index.js';
 
 export class SettingsService {
+  private static companySettings = {
+    companyName: 'RentLock Management Group LLC',
+    ein: 'XX-XXXXXXX',
+    supportEmail: 'admin@rentlock.com',
+    supportPhone: '+1 (555) 019-2834',
+    address: '100 Wall Street, Suite 1200, New York, NY 10005',
+    currency: 'USD ($)',
+    dateFormat: 'MM/DD/YYYY',
+    fiscalYearStart: 'January 1',
+    timezone: 'America/New_York (EST)',
+    accountingBasis: 'Accrual Basis',
+    lateFeeGracePeriodDays: 5,
+    standardSecurityDepositMonths: 1.5,
+  };
+
+  static async getCompanySettings() {
+    return this.companySettings;
+  }
+
+  static async updateCompanySettings(data: any) {
+    this.companySettings = {
+      ...this.companySettings,
+      ...data,
+    };
+    return this.companySettings;
+  }
+
   static async getUserRbac(email: string) {
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
