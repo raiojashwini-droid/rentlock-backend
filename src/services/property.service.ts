@@ -155,20 +155,54 @@ export class PropertyService {
   }
 
   static async createProperty(data: any) {
-    let resolvedManagerId = data.managerId ? Number(data.managerId) : undefined;
-    if (!resolvedManagerId && data.manager) {
-      const mgrName = String(data.manager).trim();
-      const mgr = await prisma.user.findFirst({
-        where: {
-          role: 'manager',
-          OR: [
-            { name: mgrName },
-            { email: mgrName.toLowerCase() },
-          ],
-        },
+    let resolvedManagerId: number | undefined = undefined;
+
+    // 1. Verify managerId if provided exists in DB as manager
+    if (data.managerId && !isNaN(Number(data.managerId)) && Number(data.managerId) < 1000000000000) {
+      const checkMgr = await prisma.user.findFirst({
+        where: { id: Number(data.managerId), role: 'manager' },
         select: { id: true },
       });
-      if (mgr) resolvedManagerId = mgr.id;
+      if (checkMgr) resolvedManagerId = checkMgr.id;
+    }
+
+    // 2. If not resolved yet, check manager name or email
+    if (!resolvedManagerId && data.manager) {
+      const cleanMgrName = String(data.manager).trim();
+      if (cleanMgrName && cleanMgrName.toLowerCase() !== 'unassigned' && cleanMgrName.toLowerCase() !== 'no manager') {
+        let mgrUser = await prisma.user.findFirst({
+          where: {
+            role: 'manager',
+            OR: [
+              { name: { equals: cleanMgrName } },
+              { email: { equals: cleanMgrName.toLowerCase() } },
+              { name: { contains: cleanMgrName } },
+            ],
+          },
+          select: { id: true },
+        });
+
+        // Auto-create manager in DB if not found
+        if (!mgrUser) {
+          const cleanEmail = cleanMgrName.includes('@')
+            ? cleanMgrName.toLowerCase()
+            : `${cleanMgrName.toLowerCase().replace(/[^a-z0-9]/g, '')}@rentlock.com`;
+          const passwordHash = await hashPassword('demo123');
+          mgrUser = await prisma.user.upsert({
+            where: { email: cleanEmail },
+            update: { role: 'manager', name: cleanMgrName },
+            create: {
+              name: cleanMgrName,
+              email: cleanEmail,
+              role: 'manager',
+              passwordHash,
+            },
+            select: { id: true },
+          }).catch(() => null);
+        }
+
+        if (mgrUser) resolvedManagerId = mgrUser.id;
+      }
     }
 
     let resolvedOwnerId: number | undefined = undefined;
@@ -286,20 +320,54 @@ export class PropertyService {
   }
 
   static async updateProperty(id: number, data: any) {
-    let resolvedManagerId = data.managerId ? Number(data.managerId) : undefined;
-    if (!resolvedManagerId && data.manager) {
-      const mgrName = String(data.manager).trim();
-      const mgr = await prisma.user.findFirst({
-        where: {
-          role: 'manager',
-          OR: [
-            { name: mgrName },
-            { email: mgrName.toLowerCase() },
-          ],
-        },
+    let resolvedManagerId: number | undefined = undefined;
+
+    // 1. Verify managerId if provided exists in DB as manager
+    if (data.managerId && !isNaN(Number(data.managerId)) && Number(data.managerId) < 1000000000000) {
+      const checkMgr = await prisma.user.findFirst({
+        where: { id: Number(data.managerId), role: 'manager' },
         select: { id: true },
       });
-      if (mgr) resolvedManagerId = mgr.id;
+      if (checkMgr) resolvedManagerId = checkMgr.id;
+    }
+
+    // 2. If not resolved yet, check manager name or email
+    if (!resolvedManagerId && data.manager) {
+      const cleanMgrName = String(data.manager).trim();
+      if (cleanMgrName && cleanMgrName.toLowerCase() !== 'unassigned' && cleanMgrName.toLowerCase() !== 'no manager') {
+        let mgrUser = await prisma.user.findFirst({
+          where: {
+            role: 'manager',
+            OR: [
+              { name: { equals: cleanMgrName } },
+              { email: { equals: cleanMgrName.toLowerCase() } },
+              { name: { contains: cleanMgrName } },
+            ],
+          },
+          select: { id: true },
+        });
+
+        // Auto-create manager in DB if not found
+        if (!mgrUser) {
+          const cleanEmail = cleanMgrName.includes('@')
+            ? cleanMgrName.toLowerCase()
+            : `${cleanMgrName.toLowerCase().replace(/[^a-z0-9]/g, '')}@rentlock.com`;
+          const passwordHash = await hashPassword('demo123');
+          mgrUser = await prisma.user.upsert({
+            where: { email: cleanEmail },
+            update: { role: 'manager', name: cleanMgrName },
+            create: {
+              name: cleanMgrName,
+              email: cleanEmail,
+              role: 'manager',
+              passwordHash,
+            },
+            select: { id: true },
+          }).catch(() => null);
+        }
+
+        if (mgrUser) resolvedManagerId = mgrUser.id;
+      }
     }
 
     let resolvedOwnerId: number | undefined = undefined;
