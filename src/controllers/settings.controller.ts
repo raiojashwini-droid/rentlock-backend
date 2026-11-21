@@ -3,24 +3,6 @@ import { SettingsService } from '../services/settings.service.js';
 import { sendSuccess, sendPaginated } from '../utils/response.js';
 
 export class SettingsController {
-  static async getCompanySettings(_req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await SettingsService.getCompanySettings();
-      return sendSuccess(res, data);
-    } catch (error) {
-      return next(error);
-    }
-  }
-
-  static async updateCompanySettings(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = await SettingsService.updateCompanySettings(req.body);
-      return sendSuccess(res, data, 'Company settings updated');
-    } catch (error) {
-      return next(error);
-    }
-  }
-
   static async getUserRbac(req: Request, res: Response, next: NextFunction) {
     try {
       const email = req.params.email;
@@ -74,7 +56,7 @@ export class SettingsController {
     }
   }
 
-  static async getCompanySettings(req: Request, res: Response, next: NextFunction) {
+  static async getCompanySettings(_req: Request, res: Response, next: NextFunction) {
     try {
       const data = await SettingsService.getCompanySettings();
       return sendSuccess(res, data);
